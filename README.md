@@ -42,10 +42,9 @@ FilmFind goes beyond traditional movie recommendation systems by:
 
 ```
 "Shows like Stranger Things but with more horror elements"
-"Dark Korean thrillers from after 2015"
-"Uplifting sci-fi with strong female leads"
-"Mystery series with supernatural elements like Stranger Things"
-"80s nostalgia shows with group of friends fighting monsters"
+"Movies about F1 racing with intense competition and personal rivalries"
+"Mystery and magical adventures like Harry Potter with school settings"
+"Lighthearted sitcoms like Friends about group of friends navigating life and relationships"
 ```
 
 ---

@@ -1,0 +1,74 @@
+"""
+Movie Pydantic schemas for API requests/responses
+"""
+from typing import Optional, List
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class GenreSchema(BaseModel):
+    """Genre schema"""
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class KeywordSchema(BaseModel):
+    """Keyword schema"""
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class CastSchema(BaseModel):
+    """Cast schema"""
+    id: int
+    name: str
+    character_name: Optional[str] = None
+    profile_path: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MovieBase(BaseModel):
+    """Base movie schema"""
+    title: str
+    original_title: Optional[str] = None
+    overview: Optional[str] = None
+    tagline: Optional[str] = None
+    release_date: Optional[datetime] = None
+    runtime: Optional[int] = None
+    original_language: Optional[str] = None
+    poster_path: Optional[str] = None
+    backdrop_path: Optional[str] = None
+
+
+class MovieResponse(MovieBase):
+    """Movie response schema"""
+    id: int
+    tmdb_id: int
+    popularity: Optional[float] = None
+    vote_average: Optional[float] = None
+    vote_count: Optional[int] = None
+    genres: List[GenreSchema] = []
+    keywords: List[KeywordSchema] = []
+    cast_members: List[CastSchema] = []
+    streaming_providers: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MovieSearchResult(MovieResponse):
+    """Movie search result with similarity scores"""
+    similarity_score: float = Field(..., description="Semantic similarity score")
+    match_explanation: Optional[str] = Field(None, description="Why this movie was recommended")
+    final_score: Optional[float] = Field(None, description="Final ranking score")
+
+    class Config:
+        from_attributes = True
