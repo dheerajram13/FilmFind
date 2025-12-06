@@ -187,7 +187,7 @@ Interaction sequence between all system components during a search request.
 - **Redis**: Caching layer (Upstash free tier)
 - **APScheduler**: Background job scheduling
 
-### **AI/ML (100% FREE)**
+### **AI/ML**
 - **sentence-transformers/all-mpnet-base-v2**: Semantic embeddings (768-dim)
 - **Groq API**: LLM for query understanding and re-ranking (free tier: 30 req/min)
 - **Ollama**: Local LLM alternative (Llama 3.2, unlimited)
@@ -631,8 +631,3 @@ If you find FilmFind useful, please consider:
 
 ---
 
-<div align="center">
-
-**Built with ❤️ using AI, Vector Search, and Modern Web Technologies**
-
-</div>
