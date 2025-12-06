@@ -22,7 +22,6 @@ FilmFind is a cutting-edge AI-powered movie and TV series recommendation system 
 - [Getting Started](#-getting-started)
 - [Project Structure](#-project-structure)
 - [API Documentation](#-api-documentation)
-- [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -215,6 +214,124 @@ Interaction sequence between all system components during a search request.
 
 ---
 
+## 🛠️ Backend Architecture Highlights
+
+### **TMDB Service Module (`app/services/TMDB/`)**
+
+Following Single Responsibility Principle, we've separated the TMDB service into three focused modules:
+
+#### **1. TMDBAPIClient** - HTTP Communication Layer
+```python
+from app.services.TMDB import TMDBAPIClient
+
+client = TMDBAPIClient(api_key="your_key")
+movie = client.get_movie(movie_id=550)
+popular = client.get_popular_movies(page=1)
+```
+- ✅ Handles all TMDB API requests
+- ✅ Built-in rate limiting (40 requests/10s)
+- ✅ Automatic error handling
+- ✅ Uses HTTPClient utility for retry logic
+
+#### **2. TMDBDataValidator** - Data Validation & Cleaning
+```python
+from app.services.TMDB import TMDBDataValidator
+
+validator = TMDBDataValidator()
+is_valid = validator.validate_movie(raw_data)
+cleaned = validator.clean_movie_data(raw_data)
+```
+- ✅ Validates required fields
+- ✅ Normalizes data structure
+- ✅ Handles missing/invalid dates
+- ✅ Extracts genres, cast, keywords
+
+#### **3. TMDBService** - High-Level Facade
+```python
+from app.services.TMDB import TMDBService
+
+with TMDBService() as service:
+    movie = service.fetch_movie(550)           # Fetch + validate + clean
+    popular = service.fetch_popular_movies()   # Batch fetch with validation
+    genres = service.get_all_genres()
+```
+- ✅ Simple interface to complex operations
+- ✅ Automatic validation and cleaning
+- ✅ Context manager for resource cleanup
+- ✅ Batch operations with pagination
+
+### **Reusable Utilities (`app/utils/`)**
+
+We've built a comprehensive utilities module following SOLID principles:
+
+#### **HTTPClient** - Generic HTTP wrapper with retry logic
+```python
+from app.utils import HTTPClient
+
+client = HTTPClient(base_url="https://api.example.com", timeout=30)
+data = client.get_json("/endpoint", params={"key": "value"})
+```
+- ✅ Automatic retry with exponential backoff
+- ✅ Built-in logging and error handling
+- ✅ Context manager support
+- ✅ Reusable across all services
+
+#### **RateLimiter** - API rate limiting utility
+```python
+from app.utils import RateLimiter
+
+limiter = RateLimiter(max_requests=30, time_window=60)
+limiter.wait_if_needed()  # Automatically waits if limit exceeded
+```
+- ✅ Sliding window algorithm
+- ✅ Configurable limits
+- ✅ Thread-safe for single-threaded apps
+
+#### **Logger Setup** - Consistent logging across the app
+```python
+from app.utils import setup_logger, get_logger
+
+setup_logger("logs/app.log", "INFO")
+logger = get_logger(__name__)
+logger.info("Application started")
+```
+- ✅ Console + file logging
+- ✅ Log rotation (10 MB)
+- ✅ Color-coded output
+
+#### **Retry Decorator** - Exponential backoff for any function
+```python
+from app.utils import retry_with_backoff
+
+@retry_with_backoff(max_retries=3, initial_delay=1.0)
+def fetch_data():
+    return api.get("/data")
+```
+- ✅ Configurable retries
+- ✅ Exponential backoff
+- ✅ Custom exception handling
+
+### **Constants Module (`app/core/constants.py`)**
+
+Centralized constants for better maintainability:
+- 🔗 API URLs (TMDB, Groq, Ollama)
+- 🎯 LLM models and configurations
+- 📊 Scoring weights and dimensions
+- 🗄️ Cache TTLs and key prefixes
+- 🌍 Supported languages and genres
+- ⚙️ All magic numbers and strings in one place
+
+### **Design Patterns Used**
+
+- ✅ **Single Responsibility Principle** - Each class has one clear purpose
+- ✅ **Dependency Injection** - Services don't create their dependencies
+- ✅ **Facade Pattern** - Simple interfaces to complex subsystems
+- ✅ **Strategy Pattern** - Multiple ingestion strategies
+- ✅ **Decorator Pattern** - Retry logic via decorators
+- ✅ **Context Manager** - Proper resource cleanup
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -326,32 +443,49 @@ filmfind/
 │   │   │   │   └── filters.py         # Filter endpoints
 │   │   │   └── dependencies.py        # Dependency injection
 │   │   ├── core/
-│   │   │   ├── config.py              # Configuration management
+│   │   │   ├── config.py              # Environment settings (Pydantic)
+│   │   │   ├── constants.py           # Application constants ✨
 │   │   │   ├── database.py            # Database connection
 │   │   │   └── cache.py               # Redis cache wrapper
 │   │   ├── models/
-│   │   │   ├── movie.py               # Movie ORM models
+│   │   │   ├── movie.py               # Movie ORM models (SQLAlchemy)
 │   │   │   └── user.py                # User models (optional)
 │   │   ├── services/
-│   │   │   ├── tmdb_service.py        # TMDB API client
-│   │   │   ├── embedding_service.py   # Embedding generation
-│   │   │   ├── vector_search.py       # FAISS vector search
-│   │   │   ├── query_parser.py        # NLP query parsing
-│   │   │   ├── reranker.py            # LLM re-ranking
-│   │   │   └── scoring_engine.py      # Multi-signal scoring
+│   │   │   ├── TMDB/                   # TMDB Service Module ✅ Module 1.1
+│   │   │   │   ├── __init__.py         # Module exports
+│   │   │   │   ├── tmdb_client.py      # API HTTP client (SRP)
+│   │   │   │   ├── tmdb_validator.py   # Data validation & cleaning (SRP)
+│   │   │   │   └── tmdb_service.py     # High-level facade
+│   │   │   ├── embedding_service.py    # Embedding generation
+│   │   │   ├── vector_search.py        # FAISS vector search
+│   │   │   ├── query_parser.py         # NLP query parsing
+│   │   │   ├── reranker.py             # LLM re-ranking
+│   │   │   └── scoring_engine.py       # Multi-signal scoring
 │   │   ├── schemas/
-│   │   │   ├── search.py              # Search request/response schemas
-│   │   │   └── movie.py               # Movie schemas
+│   │   │   ├── search.py              # Search request/response (Pydantic)
+│   │   │   └── movie.py               # Movie schemas (Pydantic)
+│   │   ├── utils/                     # Reusable utilities ✨
+│   │   │   ├── rate_limiter.py        # Rate limiting utility
+│   │   │   ├── http_client.py         # HTTP client with retry
+│   │   │   ├── logger.py              # Logging setup
+│   │   │   └── retry.py               # Retry decorator
 │   │   └── main.py                    # FastAPI app entry point
 │   ├── scripts/
-│   │   ├── ingest_tmdb.py             # Data ingestion script
+│   │   ├── ingest_tmdb.py             # Data ingestion ✅ Module 1.1
 │   │   ├── generate_embeddings.py     # Embedding generation
 │   │   └── build_index.py             # Vector index builder
 │   ├── tests/
-│   │   ├── test_search.py
-│   │   └── test_embeddings.py
-│   ├── requirements.txt
-│   └── Dockerfile
+│   │   ├── test_search.py             # Search endpoint tests
+│   │   └── test_embeddings.py         # Embedding tests
+│   ├── data/
+│   │   ├── raw/                       # Raw TMDB JSON data
+│   │   ├── processed/                 # Cleaned data
+│   │   └── embeddings/                # Vector embeddings
+│   ├── logs/                          # Application logs
+│   ├── requirements.txt               # Python dependencies
+│   ├── .env.example                   # Environment template
+│   ├── Dockerfile                     # Docker configuration
+│   └── README.md                      # Backend documentation
 │
 ├── frontend/
 │   ├── app/
