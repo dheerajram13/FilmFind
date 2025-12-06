@@ -2,8 +2,10 @@
 Redis cache wrapper
 """
 import json
-from typing import Optional, Any
+from typing import Any, Optional
+
 import redis
+
 from app.core.config import settings
 
 
@@ -12,9 +14,7 @@ class CacheManager:
 
     def __init__(self):
         self.redis_client = redis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True
+            settings.REDIS_URL, encoding="utf-8", decode_responses=True
         )
 
     def get(self, key: str) -> Optional[Any]:
