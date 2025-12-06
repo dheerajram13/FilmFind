@@ -1,9 +1,8 @@
 """
 Configuration management for FilmFind backend
 """
-from typing import Optional
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -22,22 +21,16 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(
         default="postgresql://postgres:postgres@localhost:5432/filmfind",
-        description="PostgreSQL database URL"
+        description="PostgreSQL database URL",
     )
     DB_ECHO: bool = False  # SQLAlchemy echo SQL queries
 
     # Redis Cache
-    REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis connection URL"
-    )
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
     CACHE_TTL: int = 3600  # 1 hour default TTL
 
     # TMDB API
-    TMDB_API_KEY: str = Field(
-        default="",
-        description="TMDB API key for fetching movie data"
-    )
+    TMDB_API_KEY: str = Field(default="", description="TMDB API key for fetching movie data")
     TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
     TMDB_IMAGE_BASE_URL: str = "https://image.tmdb.org/t/p"
     TMDB_RATE_LIMIT: int = 40  # requests per 10 seconds
@@ -45,21 +38,15 @@ class Settings(BaseSettings):
     # AI/ML Models
     VECTOR_MODEL: str = Field(
         default="sentence-transformers/all-mpnet-base-v2",
-        description="Sentence transformer model for embeddings"
+        description="Sentence transformer model for embeddings",
     )
     EMBEDDING_DIMENSION: int = 768  # all-mpnet-base-v2 dimension
 
     # LLM Provider
-    LLM_PROVIDER: str = Field(
-        default="groq",
-        description="LLM provider: 'groq' or 'ollama'"
-    )
+    LLM_PROVIDER: str = Field(default="groq", description="LLM provider: 'groq' or 'ollama'")
 
     # Groq API (Free Tier)
-    GROQ_API_KEY: str = Field(
-        default="",
-        description="Groq API key for LLM inference"
-    )
+    GROQ_API_KEY: str = Field(default="", description="Groq API key for LLM inference")
     GROQ_MODEL: str = "llama-3.1-70b-versatile"
     GROQ_MAX_TOKENS: int = 1024
     GROQ_TEMPERATURE: float = 0.7
@@ -85,16 +72,12 @@ class Settings(BaseSettings):
     WEIGHT_RECENCY: float = 0.1
 
     # CORS
-    CORS_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "https://filmfind.com"
-    ]
+    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000", "https://filmfind.com"]
 
     # Security
     SECRET_KEY: str = Field(
         default="your-secret-key-change-in-production",
-        description="Secret key for JWT token generation"
+        description="Secret key for JWT token generation",
     )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

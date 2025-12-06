@@ -1,17 +1,15 @@
 """
 Logger utility for consistent logging across the application
 """
-import sys
 from pathlib import Path
+import sys
+
 from loguru import logger
+
 from app.core.config import settings
 
 
-def setup_logger(
-    log_file: str = None,
-    level: str = None,
-    rotation: str = "10 MB"
-) -> None:
+def setup_logger(log_file: str = None, level: str = None, rotation: str = "10 MB") -> None:
     """
     Setup application logger with file and console output
 
@@ -37,11 +35,11 @@ def setup_logger(
     logger.add(
         sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-               "<level>{level: <8}</level> | "
-               "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-               "<level>{message}</level>",
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "<level>{message}</level>",
         level=level,
-        colorize=True
+        colorize=True,
     )
 
     # File handler without colors
@@ -51,7 +49,7 @@ def setup_logger(
         level="DEBUG",
         rotation=rotation,
         retention="30 days",
-        compression="zip"
+        compression="zip",
     )
 
     logger.info(f"Logger initialized. File: {log_file}, Level: {level}")
@@ -71,5 +69,5 @@ def get_logger(name: str):
     log = get_logger(__name__)
     log.info("Hello world")
     """
-    
+
     return logger.bind(name=name)

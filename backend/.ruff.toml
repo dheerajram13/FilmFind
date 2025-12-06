@@ -1,0 +1,106 @@
+# Ruff Configuration
+# Modern, fast Python linter (replaces flake8, isort, pydocstyle)
+# Docs: https://docs.astral.sh/ruff/
+
+# Target Python 3.11+
+target-version = "py311"
+
+# Line length (consistent with Black)
+line-length = 100
+
+# Exclude directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+    "*.egg-info",
+    "migrations",
+]
+
+[lint]
+# Enable rule sets
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort (import sorting)
+    "N",     # pep8-naming
+    "UP",    # pyupgrade (modern Python syntax)
+    "ANN",   # flake8-annotations (type hints)
+    "B",     # flake8-bugbear (bug detection)
+    "A",     # flake8-builtins
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez (datetime best practices)
+    "T10",   # flake8-debugger (no debugger statements)
+    "EM",    # flake8-errmsg (error message best practices)
+    "ISC",   # flake8-implicit-str-concat
+    "ICN",   # flake8-import-conventions
+    "PIE",   # flake8-pie (misc lints)
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RET",   # flake8-return
+    "SIM",   # flake8-simplify
+    "TID",   # flake8-tidy-imports
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "PL",    # pylint
+    "RUF",   # Ruff-specific rules
+]
+
+# Ignore specific rules
+ignore = [
+    "ANN101",  # Missing type annotation for self
+    "ANN102",  # Missing type annotation for cls
+    "ANN401",  # Dynamically typed expressions (Any) are disallowed
+    "B008",    # Do not perform function calls in argument defaults
+    "PLR0913", # Too many arguments to function call
+    "PLR2004", # Magic value used in comparison
+    "ISC001",  # Conflicts with formatter
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when prefixed with underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.per-file-ignores]
+# Ignore imports and annotations in __init__.py files
+"__init__.py" = ["F401", "F403", "ANN"]
+# Ignore missing docstrings in tests
+"tests/**/*.py" = ["D"]
+# Ignore script argument annotations
+"scripts/**/*.py" = ["ANN"]
+
+[lint.isort]
+# Import sorting configuration
+known-first-party = ["app"]
+force-single-line = false
+force-sort-within-sections = true
+lines-after-imports = 2
+
+[lint.pydocstyle]
+# Docstring convention (Google style)
+convention = "google"
+
+[lint.pylint]
+# Pylint settings
+max-args = 7
+max-branches = 15
+max-returns = 6
+max-statements = 50
+
+[format]
+# Formatting settings (Ruff's formatter, similar to Black)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

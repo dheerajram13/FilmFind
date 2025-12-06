@@ -3,7 +3,7 @@ Rate Limiter Utility
 Reusable rate limiting for any API or service
 """
 import time
-from typing import Optional
+
 from loguru import logger
 
 
@@ -46,8 +46,7 @@ class RateLimiter:
 
         # Remove requests outside the time window
         self.requests = [
-            req_time for req_time in self.requests
-            if now - req_time < self.time_window
+            req_time for req_time in self.requests if now - req_time < self.time_window
         ]
 
         # If at limit, wait
@@ -78,8 +77,7 @@ class RateLimiter:
 
         now = time.time()
         self.requests = [
-            req_time for req_time in self.requests
-            if now - req_time < self.time_window
+            req_time for req_time in self.requests if now - req_time < self.time_window
         ]
 
         return max(0, self.max_requests - len(self.requests))
@@ -91,11 +89,10 @@ class RateLimiter:
         Returns:
             Seconds to wait (0 if requests available)
         """
-        
+
         now = time.time()
         self.requests = [
-            req_time for req_time in self.requests
-            if now - req_time < self.time_window
+            req_time for req_time in self.requests if now - req_time < self.time_window
         ]
 
         if len(self.requests) < self.max_requests:

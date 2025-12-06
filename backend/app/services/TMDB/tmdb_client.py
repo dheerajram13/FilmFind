@@ -1,14 +1,11 @@
 """
 TMDB API Client
 """
-from typing import Optional, Dict, Any
+from typing import Any, Optional
+
 from app.core.config import settings
-from app.core.constants import (
-    TMDB_BASE_URL,
-    TMDB_DEFAULT_RATE_LIMIT,
-    HTTP_TIMEOUT_DEFAULT
-)
-from app.utils import RateLimiter, HTTPClient
+from app.core.constants import HTTP_TIMEOUT_DEFAULT, TMDB_BASE_URL, TMDB_DEFAULT_RATE_LIMIT
+from app.utils import HTTPClient, RateLimiter
 
 
 class TMDBAPIClient:
@@ -17,10 +14,7 @@ class TMDBAPIClient:
     """
 
     def __init__(
-        self,
-        api_key: str,
-        base_url: str = TMDB_BASE_URL,
-        timeout: int = HTTP_TIMEOUT_DEFAULT
+        self, api_key: str, base_url: str = TMDB_BASE_URL, timeout: int = HTTP_TIMEOUT_DEFAULT
     ):
         """
         Initialize TMDB API client
@@ -32,15 +26,13 @@ class TMDBAPIClient:
         """
 
         self.api_key = api_key
-        rate_limit = getattr(settings, 'TMDB_RATE_LIMIT', TMDB_DEFAULT_RATE_LIMIT)
+        rate_limit = getattr(settings, "TMDB_RATE_LIMIT", TMDB_DEFAULT_RATE_LIMIT)
         self.rate_limiter = RateLimiter(max_requests=rate_limit)
         self.http_client = HTTPClient(base_url=base_url, timeout=timeout)
 
     def _make_request(
-        self,
-        endpoint: str,
-        params: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, endpoint: str, params: Optional[dict[str, Any]] = None
+    ) -> Optional[dict[str, Any]]:
         """
         Make HTTP request to TMDB API
 
@@ -58,40 +50,36 @@ class TMDBAPIClient:
         # Add API key to params
         if params is None:
             params = {}
-        params['api_key'] = self.api_key
+        params["api_key"] = self.api_key
 
         # Use HTTPClient's get_json method
         return self.http_client.get_json(endpoint, params=params)
 
-    def get_movie(self, movie_id: int) -> Optional[Dict[str, Any]]:
+    def get_movie(self, movie_id: int) -> Optional[dict[str, Any]]:
         """Get movie details by ID"""
 
         return self._make_request(
-            f"/movie/{movie_id}",
-            params={"append_to_response": "keywords,credits"}
+            f"/movie/{movie_id}", params={"append_to_response": "keywords,credits"}
         )
 
-    def get_popular_movies(self, page: int = 1) -> Optional[Dict[str, Any]]:
+    def get_popular_movies(self, page: int = 1) -> Optional[dict[str, Any]]:
         """Get popular movies"""
 
         return self._make_request("/movie/popular", params={"page": page})
 
-    def get_top_rated_movies(self, page: int = 1) -> Optional[Dict[str, Any]]:
+    def get_top_rated_movies(self, page: int = 1) -> Optional[dict[str, Any]]:
         """Get top rated movies"""
-        
+
         return self._make_request("/movie/top_rated", params={"page": page})
 
-    def get_now_playing_movies(self, page: int = 1) -> Optional[Dict[str, Any]]:
+    def get_now_playing_movies(self, page: int = 1) -> Optional[dict[str, Any]]:
         """Get now playing movies"""
 
         return self._make_request("/movie/now_playing", params={"page": page})
 
     def discover_movies(
-        self,
-        page: int = 1,
-        sort_by: str = "popularity.desc",
-        **kwargs
-    ) -> Optional[Dict[str, Any]]:
+        self, page: int = 1, sort_by: str = "popularity.desc", **kwargs
+    ) -> Optional[dict[str, Any]]:
         """
         Discover movies with filters
 
@@ -105,17 +93,17 @@ class TMDBAPIClient:
 
         return self._make_request("/discover/movie", params=params)
 
-    def get_movie_keywords(self, movie_id: int) -> Optional[Dict[str, Any]]:
+    def get_movie_keywords(self, movie_id: int) -> Optional[dict[str, Any]]:
         """Get keywords for a movie"""
 
         return self._make_request(f"/movie/{movie_id}/keywords")
 
-    def get_movie_credits(self, movie_id: int) -> Optional[Dict[str, Any]]:
+    def get_movie_credits(self, movie_id: int) -> Optional[dict[str, Any]]:
         """Get credits (cast/crew) for a movie"""
-         
+
         return self._make_request(f"/movie/{movie_id}/credits")
 
-    def get_genres(self) -> Optional[Dict[str, Any]]:
+    def get_genres(self) -> Optional[dict[str, Any]]:
         """Get list of all movie genres"""
 
         return self._make_request("/genre/movie/list")

@@ -1,0 +1,76 @@
+# Pre-commit hooks configuration
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+# Docs: https://pre-commit.com/
+
+repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # Run the formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # mypy - Static type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.0
+          - types-redis
+        args: [--ignore-missing-imports, --show-error-codes]
+        exclude: ^(tests/|scripts/)
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Prevent giant files from being committed
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      # Check for files that would conflict in case-insensitive filesystems
+      - id: check-case-conflict
+      # Check for merge conflicts
+      - id: check-merge-conflict
+      # Check YAML syntax
+      - id: check-yaml
+        exclude: ^(.github/workflows/|docker-compose\.yml)
+      # Check TOML syntax
+      - id: check-toml
+      # Check JSON syntax
+      - id: check-json
+      # Ensure files end with a newline
+      - id: end-of-file-fixer
+        exclude: \.json$
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      # Check for debugger imports
+      - id: debug-statements
+      # Detect private keys
+      - id: detect-private-key
+      # Fix mixed line endings
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Check for secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: (^\.pre-commit-config\.yaml$|package-lock\.json)
+
+# Configuration
+default_language_version:
+  python: python3.11
+
+# Run hooks in parallel for speed
+fail_fast: false

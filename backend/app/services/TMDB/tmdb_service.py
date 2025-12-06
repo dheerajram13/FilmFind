@@ -1,8 +1,10 @@
 """
 TMDB API Service
 """
-from typing import Optional, List, Dict, Any
+from typing import Any, Optional
+
 from loguru import logger
+
 from app.core.config import settings
 from app.services.TMDB.tmdb_client import TMDBAPIClient
 from app.services.TMDB.tmdb_validator import TMDBDataValidator
@@ -29,7 +31,7 @@ class TMDBService:
         self.client = TMDBAPIClient(self.api_key)
         self.validator = TMDBDataValidator()
 
-    def fetch_movie(self, movie_id: int) -> Optional[Dict[str, Any]]:
+    def fetch_movie(self, movie_id: int) -> Optional[dict[str, Any]]:
         """
         Fetch and validate a single movie
 
@@ -53,10 +55,7 @@ class TMDBService:
 
         return self.validator.clean_movie_data(raw_data)
 
-    def fetch_popular_movies(
-        self,
-        max_pages: int = 10
-    ) -> List[Dict[str, Any]]:
+    def fetch_popular_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
         """
         Fetch popular movies
 
@@ -74,29 +73,26 @@ class TMDBService:
             logger.info(f"Fetching page {page}/{max_pages}")
             response = self.client.get_popular_movies(page=page)
 
-            if not response or 'results' not in response:
+            if not response or "results" not in response:
                 logger.warning(f"Failed to fetch page {page}")
                 break
 
-            for movie in response['results']:
+            for movie in response["results"]:
                 if self.validator.validate_movie(movie):
                     # Fetch full details for each movie
-                    full_data = self.fetch_movie(movie['id'])
+                    full_data = self.fetch_movie(movie["id"])
                     if full_data:
                         movies.append(full_data)
 
             # Check if we've reached the last page
-            if page >= response.get('total_pages', 0):
+            if page >= response.get("total_pages", 0):
                 break
 
         logger.info(f"Fetched {len(movies)} popular movies")
 
         return movies
 
-    def fetch_top_rated_movies(
-        self,
-        max_pages: int = 10
-    ) -> List[Dict[str, Any]]:
+    def fetch_top_rated_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
         """
         Fetch top rated movies
 
@@ -114,27 +110,23 @@ class TMDBService:
             logger.info(f"Fetching page {page}/{max_pages}")
             response = self.client.get_top_rated_movies(page=page)
 
-            if not response or 'results' not in response:
+            if not response or "results" not in response:
                 logger.warning(f"Failed to fetch page {page}")
                 break
 
-            for movie in response['results']:
+            for movie in response["results"]:
                 if self.validator.validate_movie(movie):
-                    full_data = self.fetch_movie(movie['id'])
+                    full_data = self.fetch_movie(movie["id"])
                     if full_data:
                         movies.append(full_data)
 
-            if page >= response.get('total_pages', 0):
+            if page >= response.get("total_pages", 0):
                 break
 
         logger.info(f"Fetched {len(movies)} top rated movies")
         return movies
 
-    def fetch_movies_by_genre(
-        self,
-        genre_id: int,
-        max_pages: int = 5
-    ) -> List[Dict[str, Any]]:
+    def fetch_movies_by_genre(self, genre_id: int, max_pages: int = 5) -> list[dict[str, Any]]:
         """
         Fetch movies by genre
 
@@ -149,28 +141,25 @@ class TMDBService:
         movies = []
 
         for page in range(1, max_pages + 1):
-            response = self.client.discover_movies(
-                page=page,
-                with_genres=genre_id
-            )
+            response = self.client.discover_movies(page=page, with_genres=genre_id)
 
-            if not response or 'results' not in response:
+            if not response or "results" not in response:
                 break
 
-            for movie in response['results']:
+            for movie in response["results"]:
                 if self.validator.validate_movie(movie):
-                    full_data = self.fetch_movie(movie['id'])
+                    full_data = self.fetch_movie(movie["id"])
                     if full_data:
                         movies.append(full_data)
 
-            if page >= response.get('total_pages', 0):
+            if page >= response.get("total_pages", 0):
                 break
 
         logger.info(f"Fetched {len(movies)} movies for genre {genre_id}")
-        
+
         return movies
 
-    def get_all_genres(self) -> List[Dict[str, Any]]:
+    def get_all_genres(self) -> list[dict[str, Any]]:
         """
         Get all available movie genres
 
@@ -181,11 +170,11 @@ class TMDBService:
         logger.info("Fetching all genres")
         response = self.client.get_genres()
 
-        if not response or 'genres' not in response:
+        if not response or "genres" not in response:
             logger.warning("Failed to fetch genres")
             return []
 
-        return response['genres']
+        return response["genres"]
 
     def close(self):
         """Close service and cleanup resources"""

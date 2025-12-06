@@ -2,9 +2,11 @@
 HTTP Client Utility
 Reusable HTTP client with retry logic, logging, and error handling
 """
-from typing import Optional, Dict, Any, Union
+from typing import Any, Optional, Union
+
 import httpx
 from loguru import logger
+
 from app.utils.retry import retry_with_backoff
 
 
@@ -29,9 +31,9 @@ class HTTPClient:
         self,
         base_url: Optional[str] = None,
         timeout: int = 30,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         follow_redirects: bool = True,
-        verify_ssl: bool = True
+        verify_ssl: bool = True,
     ):
         """
         Initialize HTTP client
@@ -43,14 +45,12 @@ class HTTPClient:
             follow_redirects: Whether to follow redirects
             verify_ssl: Whether to verify SSL certificates
         """
-        
+
         self.base_url = base_url or ""
         self.timeout = timeout
         self.default_headers = headers or {}
         self.client = httpx.Client(
-            timeout=timeout,
-            follow_redirects=follow_redirects,
-            verify=verify_ssl
+            timeout=timeout, follow_redirects=follow_redirects, verify=verify_ssl
         )
 
     def _build_url(self, endpoint: str) -> str:
@@ -72,7 +72,7 @@ class HTTPClient:
 
         return f"{base}/{endpoint}" if base else endpoint
 
-    def _merge_headers(self, headers: Optional[Dict[str, str]]) -> Dict[str, str]:
+    def _merge_headers(self, headers: Optional[dict[str, str]]) -> dict[str, str]:
         """
         Merge default headers with request-specific headers
 
@@ -89,16 +89,14 @@ class HTTPClient:
         return merged
 
     @retry_with_backoff(
-        max_retries=3,
-        initial_delay=1.0,
-        exceptions=(httpx.RequestError, httpx.TimeoutException)
+        max_retries=3, initial_delay=1.0, exceptions=(httpx.RequestError, httpx.TimeoutException)
     )
     def get(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
+        params: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        **kwargs,
     ) -> httpx.Response:
         """
         Make GET request
@@ -123,12 +121,7 @@ class HTTPClient:
         logger.debug(f"GET {url} params={params}")
 
         try:
-            response = self.client.get(
-                url,
-                params=params,
-                headers=merged_headers,
-                **kwargs
-            )
+            response = self.client.get(url, params=params, headers=merged_headers, **kwargs)
             response.raise_for_status()
             logger.debug(f"GET {url} -> {response.status_code}")
             return response
@@ -140,17 +133,15 @@ class HTTPClient:
             raise
 
     @retry_with_backoff(
-        max_retries=3,
-        initial_delay=1.0,
-        exceptions=(httpx.RequestError, httpx.TimeoutException)
+        max_retries=3, initial_delay=1.0, exceptions=(httpx.RequestError, httpx.TimeoutException)
     )
     def post(
         self,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
+        data: Optional[dict[str, Any]] = None,
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        **kwargs,
     ) -> httpx.Response:
         """
         Make POST request
@@ -169,20 +160,14 @@ class HTTPClient:
             httpx.HTTPStatusError: For 4xx/5xx responses
             httpx.RequestError: For connection errors
         """
-        
+
         url = self._build_url(endpoint)
         merged_headers = self._merge_headers(headers)
 
         logger.debug(f"POST {url}")
 
         try:
-            response = self.client.post(
-                url,
-                data=data,
-                json=json,
-                headers=merged_headers,
-                **kwargs
-            )
+            response = self.client.post(url, data=data, json=json, headers=merged_headers, **kwargs)
             response.raise_for_status()
             logger.debug(f"POST {url} -> {response.status_code}")
             return response
@@ -194,17 +179,15 @@ class HTTPClient:
             raise
 
     @retry_with_backoff(
-        max_retries=3,
-        initial_delay=1.0,
-        exceptions=(httpx.RequestError, httpx.TimeoutException)
+        max_retries=3, initial_delay=1.0, exceptions=(httpx.RequestError, httpx.TimeoutException)
     )
     def put(
         self,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
+        data: Optional[dict[str, Any]] = None,
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        **kwargs,
     ) -> httpx.Response:
         """
         Make PUT request
@@ -226,13 +209,7 @@ class HTTPClient:
         logger.debug(f"PUT {url}")
 
         try:
-            response = self.client.put(
-                url,
-                data=data,
-                json=json,
-                headers=merged_headers,
-                **kwargs
-            )
+            response = self.client.put(url, data=data, json=json, headers=merged_headers, **kwargs)
             response.raise_for_status()
             logger.debug(f"PUT {url} -> {response.status_code}")
             return response
@@ -244,15 +221,10 @@ class HTTPClient:
             raise
 
     @retry_with_backoff(
-        max_retries=3,
-        initial_delay=1.0,
-        exceptions=(httpx.RequestError, httpx.TimeoutException)
+        max_retries=3, initial_delay=1.0, exceptions=(httpx.RequestError, httpx.TimeoutException)
     )
     def delete(
-        self,
-        endpoint: str,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
+        self, endpoint: str, headers: Optional[dict[str, str]] = None, **kwargs
     ) -> httpx.Response:
         """
         Make DELETE request
@@ -272,11 +244,7 @@ class HTTPClient:
         logger.debug(f"DELETE {url}")
 
         try:
-            response = self.client.delete(
-                url,
-                headers=merged_headers,
-                **kwargs
-            )
+            response = self.client.delete(url, headers=merged_headers, **kwargs)
             response.raise_for_status()
             logger.debug(f"DELETE {url} -> {response.status_code}")
             return response
@@ -290,10 +258,10 @@ class HTTPClient:
     def get_json(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
-    ) -> Optional[Union[Dict[str, Any], list]]:
+        params: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        **kwargs,
+    ) -> Optional[Union[dict[str, Any], list]]:
         """
         Make GET request and return JSON response
 
@@ -317,10 +285,10 @@ class HTTPClient:
     def post_json(
         self,
         endpoint: str,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
-    ) -> Optional[Union[Dict[str, Any], list]]:
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        **kwargs,
+    ) -> Optional[Union[dict[str, Any], list]]:
         """
         Make POST request and return JSON response
 

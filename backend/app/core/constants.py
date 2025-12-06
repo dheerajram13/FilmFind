@@ -86,17 +86,17 @@ EMBEDDING_MODELS = {
     "all-mpnet-base-v2": {
         "name": "sentence-transformers/all-mpnet-base-v2",
         "dimension": 768,
-        "description": "Best quality, slower"
+        "description": "Best quality, slower",
     },
     "all-MiniLM-L6-v2": {
         "name": "sentence-transformers/all-MiniLM-L6-v2",
         "dimension": 384,
-        "description": "Fast and good quality"
+        "description": "Fast and good quality",
     },
     "paraphrase-multilingual": {
         "name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
         "dimension": 768,
-        "description": "Multilingual support"
+        "description": "Multilingual support",
     },
 }
 
@@ -150,12 +150,12 @@ EMOTION_DIMENSIONS = [
 
 # Cache TTL (seconds)
 CACHE_TTL = {
-    "search_results": 3600,      # 1 hour
-    "movie_details": 86400,      # 24 hours
-    "embeddings": -1,            # Permanent
-    "llm_rerank": 21600,         # 6 hours
-    "trending": 1800,            # 30 minutes
-    "genres": 604800,            # 7 days
+    "search_results": 3600,  # 1 hour
+    "movie_details": 86400,  # 24 hours
+    "embeddings": -1,  # Permanent
+    "llm_rerank": 21600,  # 6 hours
+    "trending": 1800,  # 30 minutes
+    "genres": 604800,  # 7 days
 }
 
 # Cache key prefixes
