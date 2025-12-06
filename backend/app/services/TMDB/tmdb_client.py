@@ -4,13 +4,18 @@ TMDB API Client
 from typing import Any, Optional
 
 from app.core.config import settings
-from app.core.constants import HTTP_TIMEOUT_DEFAULT, TMDB_BASE_URL, TMDB_DEFAULT_RATE_LIMIT
+from app.core.constants import (
+    HTTP_TIMEOUT_DEFAULT,
+    TMDB_BASE_URL,
+    TMDB_DEFAULT_RATE_LIMIT,
+    TMDB_RATE_WINDOW,
+)
 from app.utils import HTTPClient, RateLimiter
 
 
 class TMDBAPIClient:
     """
-    TMDB API HTTP client(SRP)
+    TMDB API HTTP client (SRP)
     """
 
     def __init__(
@@ -27,7 +32,10 @@ class TMDBAPIClient:
 
         self.api_key = api_key
         rate_limit = getattr(settings, "TMDB_RATE_LIMIT", TMDB_DEFAULT_RATE_LIMIT)
-        self.rate_limiter = RateLimiter(max_requests=rate_limit)
+        self.rate_limiter = RateLimiter(
+            max_requests=rate_limit,
+            time_window=TMDB_RATE_WINDOW
+        )
         self.http_client = HTTPClient(base_url=base_url, timeout=timeout)
 
     def _make_request(
@@ -45,7 +53,7 @@ class TMDBAPIClient:
         """
 
         # Apply Rate limiting if needed
-        self.rate_limiter.wait_if_needed()
+        self.rate_limiter.check_and_wait()
 
         # Add API key to params
         if params is None:

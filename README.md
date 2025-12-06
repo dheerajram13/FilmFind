@@ -281,7 +281,7 @@ data = client.get_json("/endpoint", params={"key": "value"})
 from app.utils import RateLimiter
 
 limiter = RateLimiter(max_requests=30, time_window=60)
-limiter.wait_if_needed()  # Automatically waits if limit exceeded
+limiter.check_and_wait()  # Automatically waits if limit exceeded
 ```
 - ✅ Sliding window algorithm
 - ✅ Configurable limits

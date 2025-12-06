@@ -6,44 +6,45 @@ Usage:
     python scripts/ingest_tmdb.py --limit 1000 --strategy popular
     python scripts/ingest_tmdb.py --strategy genres --max-pages 5
 """
-import sys
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
-from typing import List, Dict, Any
-from datetime import datetime
+import sys
+from typing import Any
+
 from loguru import logger
 from tqdm import tqdm
+
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.TMDB.tmdb_service import TMDBService
 from app.core.config import settings
+from app.services.TMDB.tmdb_service import TMDBService
 
 
 class TMDBDataIngester:
     """
-    TMDB data ingestion manager(SRP): 
+    TMDB data ingestion manager (SRP):
         Orchestrates data ingestion workflow
     """
 
-    def __init__(self, output_dir: str = "data/raw"):
+    def __init__(self, output_dir: str = "data/raw", fetch_full_details: bool = False):
         """
         Initialize ingester
 
         Args:
             output_dir: Directory to save raw data
+            fetch_full_details: If True, fetches complete movie details (slower)
+                               If False, fetches basic data only (faster, recommended for bulk)
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.tmdb_service = TMDBService()
+        self.fetch_full_details = fetch_full_details
 
-    def save_movies_to_json(
-        self,
-        movies: List[Dict[str, Any]],
-        filename: str
-    ) -> None:
+    def save_movies_to_json(self, movies: list[dict[str, Any]], filename: str) -> None:
         """
         Save movies to JSON file
 
@@ -54,14 +55,14 @@ class TMDBDataIngester:
         output_path = self.output_dir / filename
         logger.info(f"Saving {len(movies)} movies to {output_path}")
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(movies, f, indent=2, default=str, ensure_ascii=False)
 
         logger.success(f"Saved to {output_path}")
 
-    def ingest_popular_movies(self, max_pages: int = 10) -> List[Dict[str, Any]]:
+    def _fetch_popular_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
         """
-        Ingest popular movies
+        Fetch popular movies without saving (internal method)
 
         Args:
             max_pages: Maximum pages to fetch
@@ -69,18 +70,14 @@ class TMDBDataIngester:
         Returns:
             List of movie data
         """
-        logger.info(f"Starting popular movies ingestion (max {max_pages} pages)")
+        logger.info(f"Fetching popular movies (max {max_pages} pages)")
+        return self.tmdb_service.fetch_popular_movies(
+            max_pages=max_pages, fetch_full_details=self.fetch_full_details
+        )
 
-        movies = self.tmdb_service.fetch_popular_movies(max_pages=max_pages)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.save_movies_to_json(movies, f"popular_movies_{timestamp}.json")
-
-        return movies
-
-    def ingest_top_rated_movies(self, max_pages: int = 10) -> List[Dict[str, Any]]:
+    def _fetch_top_rated_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
         """
-        Ingest top rated movies
+        Fetch top rated movies without saving (internal method)
 
         Args:
             max_pages: Maximum pages to fetch
@@ -88,26 +85,22 @@ class TMDBDataIngester:
         Returns:
             List of movie data
         """
-        logger.info(f"Starting top rated movies ingestion (max {max_pages} pages)")
+        logger.info(f"Fetching top rated movies (max {max_pages} pages)")
+        return self.tmdb_service.fetch_top_rated_movies(
+            max_pages=max_pages, fetch_full_details=self.fetch_full_details
+        )
 
-        movies = self.tmdb_service.fetch_top_rated_movies(max_pages=max_pages)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.save_movies_to_json(movies, f"top_rated_movies_{timestamp}.json")
-
-        return movies
-
-    def ingest_by_genres(self, max_pages_per_genre: int = 5) -> List[Dict[str, Any]]:
+    def _fetch_by_genres(self, max_pages_per_genre: int = 5) -> list[dict[str, Any]]:
         """
-        Ingest movies for all genres
+        Fetch movies for all genres without saving (internal method)
 
         Args:
             max_pages_per_genre: Maximum pages per genre
 
         Returns:
-            List of all movie data
+            List of all unique movie data
         """
-        logger.info("Starting genre-based ingestion")
+        logger.info("Fetching genre-based movies")
 
         # Get all genres
         genres = self.tmdb_service.get_all_genres()
@@ -121,20 +114,84 @@ class TMDBDataIngester:
             logger.info(f"Fetching movies for genre: {genre['name']} (ID: {genre['id']})")
 
             movies = self.tmdb_service.fetch_movies_by_genre(
-                genre_id=genre['id'],
-                max_pages=max_pages_per_genre
+                genre_id=genre["id"],
+                max_pages=max_pages_per_genre,
+                fetch_full_details=self.fetch_full_details,
             )
 
             # Deduplicate
             for movie in movies:
-                if movie['tmdb_id'] not in seen_ids:
-                    seen_ids.add(movie['tmdb_id'])
+                if movie["tmdb_id"] not in seen_ids:
+                    seen_ids.add(movie["tmdb_id"])
                     all_movies.append(movie)
 
         logger.info(f"Total unique movies collected: {len(all_movies)}")
+        return all_movies
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.save_movies_to_json(all_movies, f"genre_movies_{timestamp}.json")
+    def ingest_popular_movies(self, max_pages: int = 10, save: bool = True) -> list[dict[str, Any]]:
+        """
+        Ingest popular movies
+
+        Args:
+            max_pages: Maximum pages to fetch
+            save: If True, saves to JSON file
+
+        Returns:
+            List of movie data
+        """
+        logger.info(f"Starting popular movies ingestion (max {max_pages} pages)")
+
+        movies = self._fetch_popular_movies(max_pages=max_pages)
+
+        if save:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.save_movies_to_json(movies, f"popular_movies_{timestamp}.json")
+
+        return movies
+
+    def ingest_top_rated_movies(
+        self, max_pages: int = 10, save: bool = True
+    ) -> list[dict[str, Any]]:
+        """
+        Ingest top rated movies
+
+        Args:
+            max_pages: Maximum pages to fetch
+            save: If True, saves to JSON file
+
+        Returns:
+            List of movie data
+        """
+        logger.info(f"Starting top rated movies ingestion (max {max_pages} pages)")
+
+        movies = self._fetch_top_rated_movies(max_pages=max_pages)
+
+        if save:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.save_movies_to_json(movies, f"top_rated_movies_{timestamp}.json")
+
+        return movies
+
+    def ingest_by_genres(
+        self, max_pages_per_genre: int = 5, save: bool = True
+    ) -> list[dict[str, Any]]:
+        """
+        Ingest movies for all genres
+
+        Args:
+            max_pages_per_genre: Maximum pages per genre
+            save: If True, saves to JSON file
+
+        Returns:
+            List of all movie data
+        """
+        logger.info("Starting genre-based ingestion")
+
+        all_movies = self._fetch_by_genres(max_pages_per_genre=max_pages_per_genre)
+
+        if save:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.save_movies_to_json(all_movies, f"genre_movies_{timestamp}.json")
 
         return all_movies
 
@@ -142,10 +199,13 @@ class TMDBDataIngester:
         self,
         max_pages_popular: int = 10,
         max_pages_top_rated: int = 10,
-        max_pages_per_genre: int = 5
-    ) -> List[Dict[str, Any]]:
+        max_pages_per_genre: int = 5,
+    ) -> list[dict[str, Any]]:
         """
         Combined ingestion strategy for maximum coverage
+
+        Fetches movies from multiple sources and deduplicates.
+        Only saves a single combined JSON file (no individual files).
 
         Args:
             max_pages_popular: Pages for popular movies
@@ -161,32 +221,33 @@ class TMDBDataIngester:
         all_movies = []
         seen_ids = set()
 
-        # 1. Popular movies
+        # 1. Popular movies (use private method to avoid duplicate saves)
         logger.info("Step 1/3: Fetching popular movies")
-        popular = self.ingest_popular_movies(max_pages=max_pages_popular)
+        popular = self._fetch_popular_movies(max_pages=max_pages_popular)
         for movie in popular:
-            if movie['tmdb_id'] not in seen_ids:
-                seen_ids.add(movie['tmdb_id'])
+            if movie["tmdb_id"] not in seen_ids:
+                seen_ids.add(movie["tmdb_id"])
                 all_movies.append(movie)
 
-        # 2. Top rated movies
+        # 2. Top rated movies (use private method to avoid duplicate saves)
         logger.info("Step 2/3: Fetching top rated movies")
-        top_rated = self.ingest_top_rated_movies(max_pages=max_pages_top_rated)
+        top_rated = self._fetch_top_rated_movies(max_pages=max_pages_top_rated)
         for movie in top_rated:
-            if movie['tmdb_id'] not in seen_ids:
-                seen_ids.add(movie['tmdb_id'])
+            if movie["tmdb_id"] not in seen_ids:
+                seen_ids.add(movie["tmdb_id"])
                 all_movies.append(movie)
 
-        # 3. Genre-based
+        # 3. Genre-based (use private method to avoid duplicate saves)
         logger.info("Step 3/3: Fetching by genres")
-        genre_movies = self.ingest_by_genres(max_pages_per_genre=max_pages_per_genre)
+        genre_movies = self._fetch_by_genres(max_pages_per_genre=max_pages_per_genre)
         for movie in genre_movies:
-            if movie['tmdb_id'] not in seen_ids:
-                seen_ids.add(movie['tmdb_id'])
+            if movie["tmdb_id"] not in seen_ids:
+                seen_ids.add(movie["tmdb_id"])
                 all_movies.append(movie)
 
         logger.success(f"Combined ingestion complete: {len(all_movies)} unique movies")
 
+        # Save only the combined result (no duplicate files)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.save_movies_to_json(all_movies, f"combined_movies_{timestamp}.json")
 
@@ -205,58 +266,57 @@ def setup_logger(log_file: str = "logs/tmdb_ingestion.log"):
     logger.add(
         sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
-        level="INFO"
+        level="INFO",
     )
     logger.add(
         log_file,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}",
         level="DEBUG",
-        rotation="10 MB"
+        rotation="10 MB",
     )
 
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description="Ingest movie data from TMDB API"
-    )
+    parser = argparse.ArgumentParser(description="Ingest movie data from TMDB API")
     parser.add_argument(
         "--strategy",
         choices=["popular", "top_rated", "genres", "combined"],
         default="combined",
-        help="Ingestion strategy"
+        help="Ingestion strategy",
     )
     parser.add_argument(
-        "--max-pages",
-        type=int,
-        default=10,
-        help="Maximum pages to fetch (for popular/top_rated)"
+        "--max-pages", type=int, default=10, help="Maximum pages to fetch (for popular/top_rated)"
     )
     parser.add_argument(
         "--max-pages-per-genre",
         type=int,
         default=5,
-        help="Maximum pages per genre (for genres/combined)"
+        help="Maximum pages per genre (for genres/combined)",
+    )
+    parser.add_argument("--limit", type=int, help="Deprecated: use --max-pages instead")
+    parser.add_argument(
+        "--output-dir", type=str, default="data/raw", help="Output directory for raw JSON files"
     )
     parser.add_argument(
-        "--limit",
-        type=int,
-        help="Deprecated: use --max-pages instead"
+        "--log-file", type=str, default="logs/tmdb_ingestion.log", help="Log file path"
     )
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="data/raw",
-        help="Output directory for raw JSON files"
+        "--fetch-full-details",
+        action="store_true",
+        help="Fetch complete movie details (slower, includes cast/keywords). Default: False (faster, basic data only)",
     )
     parser.add_argument(
-        "--log-file",
-        type=str,
-        default="logs/tmdb_ingestion.log",
-        help="Log file path"
+        "--fast",
+        action="store_true",
+        help="Alias for --no-fetch-full-details (fast mode, basic data only)",
     )
 
     args = parser.parse_args()
+
+    # Handle --fast flag
+    if args.fast:
+        args.fetch_full_details = False
 
     # Handle deprecated --limit
     if args.limit:
@@ -266,13 +326,18 @@ def main():
     # Setup logging
     setup_logger(args.log_file)
 
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("TMDB Data Ingestion Script - Module 1.1")
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info(f"Strategy: {args.strategy}")
     logger.info(f"Max pages: {args.max_pages}")
     logger.info(f"Max pages per genre: {args.max_pages_per_genre}")
+    logger.info(f"Fetch full details: {args.fetch_full_details}")
     logger.info(f"Output directory: {args.output_dir}")
+
+    if not args.fetch_full_details:
+        logger.info("⚡ Fast mode enabled: Fetching basic data only (no cast/keywords)")
+        logger.info("   Use --fetch-full-details for complete movie data (slower)")
 
     # Check API key
     if not settings.TMDB_API_KEY:
@@ -281,7 +346,9 @@ def main():
         return 1
 
     try:
-        ingester = TMDBDataIngester(output_dir=args.output_dir)
+        ingester = TMDBDataIngester(
+            output_dir=args.output_dir, fetch_full_details=args.fetch_full_details
+        )
 
         # Execute strategy
         if args.strategy == "popular":
@@ -294,12 +361,12 @@ def main():
             movies = ingester.ingest_combined(
                 max_pages_popular=args.max_pages,
                 max_pages_top_rated=args.max_pages,
-                max_pages_per_genre=args.max_pages_per_genre
+                max_pages_per_genre=args.max_pages_per_genre,
             )
 
-        logger.success("="*60)
+        logger.success("=" * 60)
         logger.success(f"Ingestion complete! Total movies: {len(movies)}")
-        logger.success("="*60)
+        logger.success("=" * 60)
 
         ingester.close()
         return 0

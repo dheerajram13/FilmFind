@@ -51,7 +51,14 @@ def retry_with_backoff(
                     else:
                         logger.error(f"All {max_retries} retry attempts failed for {func.__name__}")
 
-            raise last_exception
+            # Raise the last exception if it was captured
+            if last_exception is not None:
+                raise last_exception
+            # This should never happen, but handle it gracefully
+            raise RuntimeError(
+                f"Function {func.__name__} failed after {max_retries + 1} attempts, "
+                "but no exception was captured."
+            )
 
         return wrapper
 

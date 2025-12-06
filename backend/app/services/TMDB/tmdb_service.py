@@ -1,6 +1,7 @@
 """
 TMDB API Service
 """
+from collections.abc import Callable
 from typing import Any, Optional
 
 from loguru import logger
@@ -55,109 +56,191 @@ class TMDBService:
 
         return self.validator.clean_movie_data(raw_data)
 
-    def fetch_popular_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
+    def _fetch_paginated_movies(
+        self,
+        fetch_func: Callable[[int], Optional[dict[str, Any]]],
+        max_pages: int,
+        log_prefix: str,
+        fetch_full_details: bool = True,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch movies with pagination
+
+        Args:
+            fetch_func: Function to fetch a page of movies (takes page number)
+            max_pages: Maximum number of pages to fetch
+            log_prefix: Description for logging (e.g., "popular movies")
+            fetch_full_details: If True, fetches full details for each movie (slower, more complete)
+                               If False, uses basic data from list endpoint (faster, less data)
+
+        Returns:
+            List of cleaned movie data
+
+        Note:
+            Setting fetch_full_details=True causes N+1 API calls:
+            - 1 call per page (e.g., 10 pages = 10 calls)
+            - 1 call per movie for details (e.g., 200 movies = 200 calls)
+            - Total: ~210 API calls for 10 pages
+            With 40 req/10s rate limit, this takes ~50 seconds minimum.
+
+            For initial data ingestion, consider fetch_full_details=False
+            and fetch details in a separate batch process.
+        """
+        logger.info(
+            f"Fetching {log_prefix} (max {max_pages} pages, full_details={fetch_full_details})"
+        )
+        movies = []
+
+        for page in range(1, max_pages + 1):
+            logger.info(f"Fetching page {page}/{max_pages}")
+            response = fetch_func(page)
+
+            if not response or "results" not in response:
+                logger.warning(f"Failed to fetch page {page}")
+                break
+
+            for movie in response["results"]:
+                if self.validator.validate_movie(movie):
+                    if fetch_full_details:
+                        # Fetch complete movie details (includes cast, keywords, etc.)
+                        full_data = self.fetch_movie(movie["id"])
+                        if full_data:
+                            movies.append(full_data)
+                    else:
+                        # Use basic data from list endpoint (faster, no extra API calls)
+                        cleaned_data = self.validator.clean_movie_data(movie)
+                        movies.append(cleaned_data)
+
+            if page >= response.get("total_pages", 0):
+                break
+
+        logger.info(f"Fetched {len(movies)} {log_prefix}")
+        return movies
+
+    def fetch_popular_movies(
+        self,
+        max_pages: int = 10,
+        fetch_full_details: bool = True,
+    ) -> list[dict[str, Any]]:
         """
         Fetch popular movies
 
         Args:
             max_pages: Maximum number of pages to fetch
+            fetch_full_details: If True, fetches complete details (cast, keywords, etc.)
+                               If False, uses basic data from list (faster, fewer API calls)
 
         Returns:
             List of cleaned movie data
         """
+        return self._fetch_paginated_movies(
+            fetch_func=self.client.get_popular_movies,
+            max_pages=max_pages,
+            log_prefix="popular movies",
+            fetch_full_details=fetch_full_details,
+        )
 
-        logger.info(f"Fetching popular movies (max {max_pages} pages)")
-        movies = []
-
-        for page in range(1, max_pages + 1):
-            logger.info(f"Fetching page {page}/{max_pages}")
-            response = self.client.get_popular_movies(page=page)
-
-            if not response or "results" not in response:
-                logger.warning(f"Failed to fetch page {page}")
-                break
-
-            for movie in response["results"]:
-                if self.validator.validate_movie(movie):
-                    # Fetch full details for each movie
-                    full_data = self.fetch_movie(movie["id"])
-                    if full_data:
-                        movies.append(full_data)
-
-            # Check if we've reached the last page
-            if page >= response.get("total_pages", 0):
-                break
-
-        logger.info(f"Fetched {len(movies)} popular movies")
-
-        return movies
-
-    def fetch_top_rated_movies(self, max_pages: int = 10) -> list[dict[str, Any]]:
+    def fetch_top_rated_movies(
+        self,
+        max_pages: int = 10,
+        fetch_full_details: bool = True,
+    ) -> list[dict[str, Any]]:
         """
         Fetch top rated movies
 
         Args:
             max_pages: Maximum number of pages to fetch
+            fetch_full_details: If True, fetches complete details (cast, keywords, etc.)
+                               If False, uses basic data from list (faster, fewer API calls)
 
         Returns:
             List of cleaned movie data
         """
+        return self._fetch_paginated_movies(
+            fetch_func=self.client.get_top_rated_movies,
+            max_pages=max_pages,
+            log_prefix="top rated movies",
+            fetch_full_details=fetch_full_details,
+        )
 
-        logger.info(f"Fetching top rated movies (max {max_pages} pages)")
-        movies = []
-
-        for page in range(1, max_pages + 1):
-            logger.info(f"Fetching page {page}/{max_pages}")
-            response = self.client.get_top_rated_movies(page=page)
-
-            if not response or "results" not in response:
-                logger.warning(f"Failed to fetch page {page}")
-                break
-
-            for movie in response["results"]:
-                if self.validator.validate_movie(movie):
-                    full_data = self.fetch_movie(movie["id"])
-                    if full_data:
-                        movies.append(full_data)
-
-            if page >= response.get("total_pages", 0):
-                break
-
-        logger.info(f"Fetched {len(movies)} top rated movies")
-        return movies
-
-    def fetch_movies_by_genre(self, genre_id: int, max_pages: int = 5) -> list[dict[str, Any]]:
+    def fetch_movies_by_genre(
+        self,
+        genre_id: int,
+        max_pages: int = 5,
+        fetch_full_details: bool = True,
+    ) -> list[dict[str, Any]]:
         """
         Fetch movies by genre
 
         Args:
             genre_id: TMDB genre ID
             max_pages: Maximum number of pages to fetch
+            fetch_full_details: If True, fetches complete details (cast, keywords, etc.)
+                               If False, uses basic data from list (faster, fewer API calls)
 
         Returns:
             List of cleaned movie data
         """
-        logger.info(f"Fetching movies for genre {genre_id} (max {max_pages} pages)")
-        movies = []
 
-        for page in range(1, max_pages + 1):
-            response = self.client.discover_movies(page=page, with_genres=genre_id)
+        # Create a closure that captures the genre_id
+        def fetch_genre_page(page: int) -> Optional[dict[str, Any]]:
+            return self.client.discover_movies(page=page, with_genres=genre_id)
 
-            if not response or "results" not in response:
-                break
+        return self._fetch_paginated_movies(
+            fetch_func=fetch_genre_page,
+            max_pages=max_pages,
+            log_prefix=f"movies for genre {genre_id}",
+            fetch_full_details=fetch_full_details,
+        )
 
-            for movie in response["results"]:
-                if self.validator.validate_movie(movie):
-                    full_data = self.fetch_movie(movie["id"])
-                    if full_data:
-                        movies.append(full_data)
+    def fetch_movie_details_batch(
+        self,
+        movie_ids: list[int],
+        delay_between_batches: float = 0.25,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch full details for a batch of movies with rate limiting
 
-            if page >= response.get("total_pages", 0):
-                break
+        This is useful for a two-phase approach:
+        1. Fetch basic movie lists with fetch_full_details=False (fast)
+        2. Fetch complete details separately with this method (controlled rate)
 
-        logger.info(f"Fetched {len(movies)} movies for genre {genre_id}")
+        Args:
+            movie_ids: List of TMDB movie IDs to fetch
+            delay_between_batches: Seconds to wait between requests (default 0.25s = 4 req/s)
 
-        return movies
+        Returns:
+            List of cleaned movie data with full details
+
+        Example:
+            >>> # Phase 1: Fast fetch of basic data
+            >>> movies = service.fetch_popular_movies(max_pages=10, fetch_full_details=False)
+            >>> movie_ids = [m['tmdb_id'] for m in movies]
+            >>>
+            >>> # Phase 2: Batch fetch details with controlled rate
+            >>> detailed_movies = service.fetch_movie_details_batch(movie_ids)
+        """
+        import time
+
+        logger.info(
+            f"Fetching details for {len(movie_ids)} movies (delay={delay_between_batches}s)"
+        )
+        detailed_movies = []
+
+        for i, movie_id in enumerate(movie_ids, 1):
+            if i % 10 == 0:
+                logger.info(f"Fetching details: {i}/{len(movie_ids)}")
+
+            movie_data = self.fetch_movie(movie_id)
+            if movie_data:
+                detailed_movies.append(movie_data)
+
+            # Rate limiting: sleep between requests
+            if i < len(movie_ids):  # Don't sleep after last request
+                time.sleep(delay_between_batches)
+
+        logger.info(f"Fetched details for {len(detailed_movies)}/{len(movie_ids)} movies")
+        return detailed_movies
 
     def get_all_genres(self) -> list[dict[str, Any]]:
         """
