@@ -1,10 +1,48 @@
+#!/usr/bin/env python
 """
-TMDB data ingestion script
-Fetches movies from TMDB API and stores in database
+TMDB data ingestion script for FilmFind.
+
+This script fetches movie data from TMDB API and saves it as JSON files.
+It supports multiple ingestion strategies: popular, top-rated, by-genre, and combined.
 
 Usage:
-    python scripts/ingest_tmdb.py --limit 1000 --strategy popular
-    python scripts/ingest_tmdb.py --strategy genres --max-pages 5
+    # Show help
+    python scripts/ingest_tmdb.py --help
+
+    # Fetch popular movies (default 10 pages)
+    python scripts/ingest_tmdb.py --popular --max-pages 10
+
+    # Fetch top-rated movies
+    python scripts/ingest_tmdb.py --top-rated --max-pages 5
+
+    # Fetch by specific genres (Action=28, Sci-Fi=878)
+    python scripts/ingest_tmdb.py --genres 28,878 --max-pages 5
+
+    # Combined ingestion (all strategies)
+    python scripts/ingest_tmdb.py --combined --max-pages 20
+
+    # Fetch with full details (slower but more complete)
+    python scripts/ingest_tmdb.py --popular --max-pages 5 --full-details
+
+Example Output:
+    Starting TMDB data ingestion...
+    Strategy: popular
+    Max pages: 10
+
+    Fetching popular movies (page 1/10)...
+    Fetched 20 movies from page 1
+    Fetching popular movies (page 2/10)...
+    Fetched 20 movies from page 2
+    ...
+    ✓ Ingestion completed!
+    Total movies fetched: 200
+    Saved to: data/raw/popular_movies_2025-12-07.json
+
+Note:
+    - TMDB API rate limit: 40 requests per 10 seconds (automatically handled)
+    - Each page returns ~20 movies
+    - Use --full-details for complete data (includes cast, keywords, etc.)
+    - Output saved to data/raw/ directory in JSON format
 """
 import argparse
 from datetime import datetime
