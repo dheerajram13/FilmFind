@@ -71,6 +71,7 @@ class BaseRepository(Generic[ModelType]):
             created = repo.create(movie)
             ```
         """
+
         self.db.add(obj)
         self.db.commit()
         self.db.refresh(obj)
@@ -89,6 +90,7 @@ class BaseRepository(Generic[ModelType]):
         Note:
             More efficient than multiple create() calls as it uses bulk insert.
         """
+
         self.db.add_all(objects)
         self.db.commit()
         for obj in objects:
@@ -109,6 +111,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Model instance or None if not found
         """
+
         return self.db.query(self.model).filter(self.model.id == id).first()
 
     def get_all(self, skip: int = 0, limit: int = 100) -> list[ModelType]:
@@ -122,6 +125,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             List of model instances
         """
+
         return self.db.query(self.model).offset(skip).limit(limit).all()
 
     def count(self) -> int:
@@ -131,6 +135,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Total count of records in table
         """
+
         return self.db.query(self.model).count()
 
     def exists(self, id: int) -> bool:
@@ -143,6 +148,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             True if exists, False otherwise
         """
+
         return self.db.query(self.model.id).filter(self.model.id == id).first() is not None
 
     # =============================================================================
@@ -162,6 +168,7 @@ class BaseRepository(Generic[ModelType]):
         Note:
             The object must already be tracked by the session or have a valid ID.
         """
+
         self.db.merge(obj)
         self.db.commit()
         self.db.refresh(obj)
@@ -181,6 +188,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             True if deleted, False if not found
         """
+
         obj = self.get_by_id(id)
         if obj:
             self.db.delete(obj)
@@ -220,6 +228,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Refreshed model instance
         """
+        
         self.db.refresh(obj)
         return obj
 

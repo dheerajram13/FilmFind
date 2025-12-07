@@ -54,6 +54,7 @@ def check_database_connection(timeout: float = 5.0) -> dict[str, any]:
             print(f"Database is unhealthy: {health['error']}")
         ```
     """
+
     start_time = time.time()
 
     try:
@@ -110,6 +111,7 @@ def check_database_tables(db: Optional[Session] = None) -> dict[str, any]:
             - tables: List of existing tables
             - missing: List of missing tables (if any)
     """
+    
     required_tables = {
         "movies",
         "genres",
@@ -177,6 +179,7 @@ def get_database_statistics(db: Optional[Session] = None) -> dict[str, any]:
             - cast_count: Number of cast members
             - movies_with_embeddings: Number of movies with embeddings
     """
+
     session = db or SessionLocal()
     owns_session = db is None
 
