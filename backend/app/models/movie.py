@@ -61,7 +61,7 @@ movie_cast = Table(
     Column("character_name", String(255)),
     Column("order_position", Integer, nullable=False, default=0),  # 0 = main actor
     Column("created_at", DateTime, default=datetime.utcnow, nullable=False),
-    Index("idx_movie_cast_order", "movie_id", "order_position"),  # For top cast queries
+    # Note: Index 'idx_movie_cast_order' on (movie_id, order_position) is created via Alembic migration
 )
 
 
@@ -150,12 +150,16 @@ class Movie(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships (lazy loading by default)
+    # Relationships (optimized loading strategies)
+    # - selectin: Eager loading for frequently accessed small collections (genres, keywords)
+    # - select: Lazy loading for potentially large collections (cast_members)
     genres = relationship("Genre", secondary=movie_genres, back_populates="movies", lazy="selectin")
     keywords = relationship(
         "Keyword", secondary=movie_keywords, back_populates="movies", lazy="selectin"
     )
-    cast_members = relationship("Cast", secondary=movie_cast, back_populates="movies", lazy="select")
+    cast_members = relationship(
+        "Cast", secondary=movie_cast, back_populates="movies", lazy="select"
+    )
 
     # Composite Indexes (for complex queries)
     __table_args__ = (
@@ -208,7 +212,9 @@ class Movie(Base):
 
     def __repr__(self) -> str:
         """String representation for debugging."""
-        return f"<Movie(id={self.id}, tmdb_id={self.tmdb_id}, title='{self.title}', year={self.year})>"
+        return (
+            f"<Movie(id={self.id}, tmdb_id={self.tmdb_id}, title='{self.title}', year={self.year})>"
+        )
 
 
 class Genre(Base):
@@ -257,7 +263,9 @@ class Keyword(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    movies = relationship("Movie", secondary=movie_keywords, back_populates="keywords", lazy="select")
+    movies = relationship(
+        "Movie", secondary=movie_keywords, back_populates="keywords", lazy="select"
+    )
 
     def __repr__(self) -> str:
         """String representation for debugging."""
@@ -285,7 +293,9 @@ class Cast(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    movies = relationship("Movie", secondary=movie_cast, back_populates="cast_members", lazy="select")
+    movies = relationship(
+        "Movie", secondary=movie_cast, back_populates="cast_members", lazy="select"
+    )
 
     @property
     def profile_url(self) -> Optional[str]:

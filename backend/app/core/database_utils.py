@@ -14,7 +14,7 @@ Design Patterns:
 """
 
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 # =============================================================================
 
 
-def check_database_connection(timeout: float = 5.0) -> dict[str, any]:
+def check_database_connection(timeout: float = 5.0) -> dict[str, Any]:
     """
     Check if database is accessible and responsive.
 
@@ -98,7 +98,7 @@ def check_database_connection(timeout: float = 5.0) -> dict[str, any]:
         }
 
 
-def check_database_tables(db: Optional[Session] = None) -> dict[str, any]:
+def check_database_tables(db: Optional[Session] = None) -> dict[str, Any]:
     """
     Check if required database tables exist.
 
@@ -111,7 +111,7 @@ def check_database_tables(db: Optional[Session] = None) -> dict[str, any]:
             - tables: List of existing tables
             - missing: List of missing tables (if any)
     """
-    
+
     required_tables = {
         "movies",
         "genres",
@@ -164,7 +164,7 @@ def check_database_tables(db: Optional[Session] = None) -> dict[str, any]:
             session.close()
 
 
-def get_database_statistics(db: Optional[Session] = None) -> dict[str, any]:
+def get_database_statistics(db: Optional[Session] = None) -> dict[str, Any]:
     """
     Get database statistics (table row counts, etc.).
 
@@ -224,7 +224,7 @@ def get_database_statistics(db: Optional[Session] = None) -> dict[str, any]:
 # =============================================================================
 
 
-def check_migration_status() -> dict[str, any]:
+def check_migration_status() -> dict[str, Any]:
     """
     Check Alembic migration status.
 
@@ -268,7 +268,7 @@ def check_migration_status() -> dict[str, any]:
 # =============================================================================
 
 
-def get_connection_pool_status() -> dict[str, any]:
+def get_connection_pool_status() -> dict[str, Any]:
     """
     Get connection pool statistics.
 
@@ -368,15 +368,34 @@ def reindex_database() -> bool:
     Returns:
         True if successful, False otherwise
 
+    Raises:
+        ValueError: If database name contains unsafe characters
+
     Note:
         This operation can be slow and locks tables.
+        Uses CONCURRENTLY to avoid locking tables during reindex.
     """
     try:
+        # Get database name from engine URL
+        db_name = str(engine.url.database)
+
+        # Validate database name to prevent SQL injection
+        # Allow only valid Python identifiers (alphanumerics and underscores)
+        if not db_name.isidentifier():
+            error_msg = f"Unsafe database name: {db_name!r}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Execute REINDEX with quoted identifier
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
-            connection.execute(text("REINDEX DATABASE CONCURRENTLY filmfind"))
-            logger.info("REINDEX completed successfully")
+            connection.execute(text(f'REINDEX DATABASE CONCURRENTLY "{db_name}"'))
+            logger.info(f"REINDEX completed successfully for database: {db_name}")
 
         return True
+
+    except ValueError:
+        # Re-raise ValueError for unsafe database names
+        raise
 
     except Exception as e:
         logger.error(f"REINDEX failed: {e}")

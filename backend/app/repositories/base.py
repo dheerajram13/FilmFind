@@ -228,7 +228,6 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Refreshed model instance
         """
-        
         self.db.refresh(obj)
         return obj
 

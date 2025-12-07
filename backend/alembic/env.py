@@ -15,15 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings 
 from app.core.database import Base  
 
-from app.models.movie import (
-    Cast,
-    Genre,
-    Keyword,
-    Movie,
-    MovieCast,
-    MovieGenre,
-    MovieKeyword,
-)
 
 # Alembic Config object, provides access to .ini file values
 config = context.config

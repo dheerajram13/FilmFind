@@ -194,9 +194,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema - drop all tables."""
+    """Downgrade schema - drop all tables and indexes."""
 
-    # Drop association tables first (due to foreign keys)
+    # Drop indexes first (before dropping tables)
+    op.drop_index("idx_movie_cast_order", table_name="movie_cast")
+
+    # Drop association tables (due to foreign key constraints)
     op.drop_table("movie_cast")
     op.drop_table("movie_keywords")
     op.drop_table("movie_genres")
