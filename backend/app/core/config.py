@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     )
     EMBEDDING_DIMENSION: int = 768  # all-mpnet-base-v2 dimension
 
+    # Embedding Generation Settings
+    MAX_KEYWORDS: int = 10  # Maximum keywords to include in embedding text
+    MAX_CAST_MEMBERS: int = 5  # Maximum cast members to include in embedding text
+    MIN_TEXT_LENGTH: int = 10  # Minimum text length for valid embedding
+    EMBEDDING_BATCH_SIZE: int = 32  # Batch size for embedding generation
+    DB_BATCH_SIZE: int = 100  # Batch size for database operations
+
     # LLM Provider
     LLM_PROVIDER: str = Field(default="groq", description="LLM provider: 'groq' or 'ollama'")
 

@@ -347,22 +347,30 @@ class MovieRepository(BaseRepository[Movie]):
     # Embedding Operations
     # =============================================================================
 
-    def get_movies_without_embeddings(self, limit: int = 100) -> list[Movie]:
+    def get_movies_without_embeddings(self, limit: int = 100, offset: int = 0) -> list[Movie]:
         """
         Get movies that don't have semantic embeddings yet.
 
-        Useful for batch embedding generation.
+        Useful for batch embedding generation. Eagerly loads relationships
+        (genres, keywords, cast) to avoid N+1 query problems.
 
         Args:
             limit: Maximum number of movies to return
+            offset: Number of movies to skip
 
         Returns:
-            List of movies without embeddings
+            List of movies without embeddings, with relationships loaded
         """
         return (
             self.db.query(Movie)
+            .options(
+                selectinload(Movie.genres),
+                selectinload(Movie.keywords),
+                selectinload(Movie.cast_members),
+            )
             .filter(Movie.embedding_vector.is_(None))
             .order_by(desc(Movie.popularity))  # Prioritize popular movies
+            .offset(offset)
             .limit(limit)
             .all()
         )
@@ -398,6 +406,41 @@ class MovieRepository(BaseRepository[Movie]):
             Number of movies with embeddings
         """
         return self.db.query(Movie).filter(Movie.embedding_vector.isnot(None)).count()
+
+    def count_movies_without_embeddings(self) -> int:
+        """
+        Count how many movies don't have embeddings yet.
+
+        Returns:
+            Number of movies without embeddings
+        """
+        return self.db.query(Movie).filter(Movie.embedding_vector.is_(None)).count()
+
+    def update_embedding(
+        self,
+        movie_id: int,
+        embedding: list[float],
+        model_name: str = "sentence-transformers/all-mpnet-base-v2",
+    ) -> None:
+        """
+        Update movie with embedding vector and metadata.
+
+        Args:
+            movie_id: Movie ID to update
+            embedding: Embedding vector as list of floats
+            model_name: Name of the embedding model used
+
+        Raises:
+            ValueError: If movie not found
+        """
+        movie = self.get_by_id(movie_id)
+        if not movie:
+            raise ValueError(f"Movie with ID {movie_id} not found")
+
+        movie.embedding_vector = embedding
+        movie.embedding_model = model_name
+        movie.embedding_dimension = len(embedding)
+        self.db.flush()  # Flush to detect errors without committing
 
     # =============================================================================
     # Bulk Operations
