@@ -1,7 +1,7 @@
 """
 Embedding service tests
 """
-import pytest
+
 
 # To be implemented
 def test_embedding_generation():

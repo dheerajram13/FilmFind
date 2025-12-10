@@ -110,9 +110,7 @@ class TestPreprocessMovie:
         movie = Movie(id=5, tmdb_id=33333, title="Cast Test")
 
         # Add 8 cast members
-        movie.cast_members = [
-            Cast(id=i, tmdb_id=1000 + i, name=f"Actor{i}") for i in range(8)
-        ]
+        movie.cast_members = [Cast(id=i, tmdb_id=1000 + i, name=f"Actor{i}") for i in range(8)]
 
         text = TextPreprocessor.preprocess_movie(movie)
 
