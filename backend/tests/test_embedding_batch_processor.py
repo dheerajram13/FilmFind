@@ -232,7 +232,7 @@ class TestValidateEmbeddings:
         movies = []
         for i in range(5):
             movie = Movie(id=i + 1, tmdb_id=1000 + i, title=f"Movie {i}")
-            movie.embedding = np.random.rand(768).tolist()
+            movie.embedding_vector = np.random.rand(768).tolist()
             movies.append(movie)
 
         with patch.object(processor.movie_repo, "get_movies_with_embeddings") as mock_get:
@@ -248,7 +248,7 @@ class TestValidateEmbeddings:
     def test_validate_embeddings_wrong_dimensions(self, processor):
         """Test validation detects wrong dimensions."""
         movie = Movie(id=1, tmdb_id=1000, title="Movie 1")
-        movie.embedding = np.random.rand(512).tolist()  # Wrong dimension
+        movie.embedding_vector = np.random.rand(512).tolist()  # Wrong dimension
 
         with patch.object(processor.movie_repo, "get_movies_with_embeddings") as mock_get:
             mock_get.return_value = [movie]
@@ -263,7 +263,7 @@ class TestValidateEmbeddings:
     def test_validate_embeddings_not_list(self, processor):
         """Test validation detects non-list embeddings."""
         movie = Movie(id=1, tmdb_id=1000, title="Movie 1")
-        movie.embedding = "not a list"
+        movie.embedding_vector = "not a list"
 
         with patch.object(processor.movie_repo, "get_movies_with_embeddings") as mock_get:
             mock_get.return_value = [movie]
@@ -279,7 +279,7 @@ class TestValidateEmbeddings:
         """Test validation detects non-numeric values."""
         movie = Movie(id=1, tmdb_id=1000, title="Movie 1")
         embedding = [0.5] * 767 + ["not a number"]
-        movie.embedding = embedding
+        movie.embedding_vector = embedding
 
         with patch.object(processor.movie_repo, "get_movies_with_embeddings") as mock_get:
             mock_get.return_value = [movie]

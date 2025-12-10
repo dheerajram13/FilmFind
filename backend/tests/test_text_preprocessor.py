@@ -36,9 +36,9 @@ def sample_movie():
     ]
 
     movie.cast_members = [
-        Cast(id=1, name="Leonardo DiCaprio", character="Cobb", order=0),
-        Cast(id=2, name="Tom Hardy", character="Eames", order=1),
-        Cast(id=3, name="Elliot Page", character="Ariadne", order=2),
+        Cast(id=1, tmdb_id=6193, name="Leonardo DiCaprio"),
+        Cast(id=2, tmdb_id=2524, name="Tom Hardy"),
+        Cast(id=3, tmdb_id=27578, name="Elliot Page"),
     ]
 
     return movie
@@ -111,7 +111,7 @@ class TestPreprocessMovie:
 
         # Add 8 cast members
         movie.cast_members = [
-            Cast(id=i, name=f"Actor{i}", character=f"Role{i}", order=i) for i in range(8)
+            Cast(id=i, tmdb_id=1000 + i, name=f"Actor{i}") for i in range(8)
         ]
 
         text = TextPreprocessor.preprocess_movie(movie)

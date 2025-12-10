@@ -114,11 +114,12 @@ class TextPreprocessor:
         Returns:
             Cleaned text
         """
-        # Replace multiple spaces with single space
-        text = " ".join(text.split())
-
-        # Replace multiple newlines with single newline
+        # Replace multiple newlines with single newline while preserving line structure
         lines = [line.strip() for line in text.split("\n") if line.strip()]
+
+        # Clean up excessive whitespace within each line
+        lines = [" ".join(line.split()) for line in lines]
+
         text = "\n".join(lines)
 
         return text.strip()
@@ -182,6 +183,11 @@ class TextPreprocessor:
         results = []
 
         for movie in movies:
+            # Skip None entries
+            if movie is None:
+                logger.warning("Skipping None movie in batch preprocessing")
+                continue
+
             try:
                 text = TextPreprocessor.preprocess_movie(movie)
 
@@ -192,8 +198,9 @@ class TextPreprocessor:
             except Exception as e:
                 # Skip movies with preprocessing errors but log them
                 title = getattr(movie, "title", "unknown")
+                movie_id = getattr(movie, "id", "unknown")
                 logger.warning(
-                    f"Failed to preprocess movie {movie.id} ('{title}'): {e}",
+                    f"Failed to preprocess movie {movie_id} ('{title}'): {e}",
                     exc_info=True,
                 )
                 continue

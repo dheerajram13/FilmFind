@@ -316,12 +316,12 @@ class EmbeddingBatchProcessor:
                     results["errors"].append(f"Movie {movie.id}: embedding_vector is not a list")
                     continue
 
-                if len(movie.embedding_vector) != settings.EXPECTED_EMBEDDING_DIM:
+                if len(movie.embedding_vector) != settings.EMBEDDING_DIMENSION:
                     results["invalid"] += 1
                     results["errors"].append(
                         f"Movie {movie.id}: embedding has "
                         f"{len(movie.embedding_vector)} dimensions "
-                        f"(expected {settings.EXPECTED_EMBEDDING_DIM})"
+                        f"(expected {settings.EMBEDDING_DIMENSION})"
                     )
                     continue
 
