@@ -32,10 +32,7 @@ class TMDBAPIClient:
 
         self.api_key = api_key
         rate_limit = getattr(settings, "TMDB_RATE_LIMIT", TMDB_DEFAULT_RATE_LIMIT)
-        self.rate_limiter = RateLimiter(
-            max_requests=rate_limit,
-            time_window=TMDB_RATE_WINDOW
-        )
+        self.rate_limiter = RateLimiter(max_requests=rate_limit, time_window=TMDB_RATE_WINDOW)
         self.http_client = HTTPClient(base_url=base_url, timeout=timeout)
 
     def _make_request(

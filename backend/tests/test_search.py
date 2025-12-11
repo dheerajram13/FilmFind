@@ -1,8 +1,7 @@
 """
 Search endpoint tests
 """
-import pytest
-from fastapi.testclient import TestClient
+
 
 # To be implemented
 def test_search_movies():
