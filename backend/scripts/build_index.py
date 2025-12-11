@@ -43,6 +43,7 @@ from app.core.database import SessionLocal
 from app.models.movie import Embedding
 from app.services.embedding_service import get_embedding_service
 from app.services.vector_search import VectorSearchService
+from app.utils.vector_utils import VectorNormalizer
 
 
 # Setup logging
@@ -72,30 +73,33 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
         logger.info(f"Found {total_count} embeddings in database")
 
         if total_count == 0:
-            msg = "No embeddings found in database. Please run 'python scripts/generate_embeddings.py' first."
+            msg = (
+                "No embeddings found in database. "
+                "Please run 'python scripts/generate_embeddings.py' first."
+            )
             raise ValueError(msg)
 
-        # Load all embeddings
-        embeddings_data = (
-            db.query(Embedding.movie_id, Embedding.embedding_vector)
-            .order_by(Embedding.movie_id)
-            .all()
+        # Get embedding dimension from the first row
+        query = db.query(Embedding.movie_id, Embedding.embedding_vector).order_by(
+            Embedding.movie_id
         )
+        first_row = query.first()
+        if first_row is None:
+            msg = "No embeddings found in database."
+            raise ValueError(msg)
 
-        # Convert to numpy array
+        embedding_dim = len(first_row.embedding_vector)
+        logger.info(f"Embedding dimension: {embedding_dim}")
+
+        # Pre-allocate numpy array for better memory efficiency
+        embeddings_array = np.empty((total_count, embedding_dim), dtype=np.float32)
         movie_ids = []
-        embeddings_list = []
 
-        for movie_id, embedding_vector in embeddings_data:
+        # Stream results in batches to avoid loading all data into memory at once
+        for i, (movie_id, embedding_vector) in enumerate(query.yield_per(1000)):
             movie_ids.append(movie_id)
-
-            # Handle both list and numpy array formats
-            if isinstance(embedding_vector, list):
-                embeddings_list.append(embedding_vector)
-            else:
-                embeddings_list.append(embedding_vector.tolist())
-
-        embeddings_array = np.array(embeddings_list, dtype=np.float32)
+            # Direct assignment - no intermediate list conversion needed
+            embeddings_array[i] = embedding_vector
 
         logger.info(f"Loaded {len(movie_ids)} embeddings with shape {embeddings_array.shape}")
 
@@ -208,17 +212,13 @@ def benchmark_search(service: VectorSearchService, num_queries: int = 100) -> No
     logger.info("BENCHMARKING SEARCH PERFORMANCE")
     logger.info(f"{'='*60}")
 
-    get_embedding_service()
-
     # Generate random query embeddings
     logger.info(f"Generating {num_queries} random query embeddings...")
     np.random.seed(42)
     query_embeddings = np.random.randn(num_queries, service.dimension).astype(np.float32)
 
-    # Normalize
-    import faiss
-
-    faiss.normalize_L2(query_embeddings)
+    # Normalize using VectorNormalizer utility
+    VectorNormalizer.normalize_l2(query_embeddings)
 
     # Benchmark different k values
     k_values = [1, 5, 10, 20, 50, 100]

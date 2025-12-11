@@ -16,12 +16,21 @@ Design Patterns:
 import logging
 from pathlib import Path
 import pickle
+import threading
 from typing import Any
 
 import faiss
 import numpy as np
 
 from app.core.config import settings
+from app.services.exceptions import (
+    IndexBuildError,
+    IndexNotFoundError,
+    IndexNotInitializedError,
+    IndexValidationError,
+    SearchError,
+)
+from app.utils.vector_utils import VectorNormalizer
 
 
 logger = logging.getLogger(__name__)
@@ -89,11 +98,14 @@ class VectorSearchService:
             FAISS index instance
 
         Raises:
-            RuntimeError: If index not built or loaded
+            IndexNotInitializedError: If index not built or loaded
         """
         if self._index is None:
-            msg = "Index not initialized. Please build a new index using build_index() or load an existing index using load_index()."
-            raise RuntimeError(msg)
+            msg = (
+                "Index not initialized. Please build a new index using "
+                "build_index() or load an existing index using load_index()."
+            )
+            raise IndexNotInitializedError(msg)
         return self._index
 
     @property
@@ -129,8 +141,8 @@ class VectorSearchService:
             ef_construction: Search depth during construction (typical: 100-500)
 
         Raises:
-            ValueError: If embeddings and movie_ids don't match
-            RuntimeError: If index construction fails
+            IndexValidationError: If embeddings and movie_ids don't match
+            IndexBuildError: If index construction fails
 
         Example:
             ```python
@@ -140,12 +152,18 @@ class VectorSearchService:
             ```
         """
         if len(embeddings) != len(movie_ids):
-            msg = f"Embeddings count ({len(embeddings)}) must match movie_ids count ({len(movie_ids)})"
-            raise ValueError(msg)
+            msg = (
+                f"Embeddings count ({len(embeddings)}) must match "
+                f"movie_ids count ({len(movie_ids)})"
+            )
+            raise IndexValidationError(msg)
 
         if embeddings.shape[1] != self.dimension:
-            msg = f"Embedding dimension ({embeddings.shape[1]}) must match configured dimension ({self.dimension})"
-            raise ValueError(msg)
+            msg = (
+                f"Embedding dimension ({embeddings.shape[1]}) must match "
+                f"configured dimension ({self.dimension})"
+            )
+            raise IndexValidationError(msg)
 
         try:
             logger.info(
@@ -162,11 +180,9 @@ class VectorSearchService:
             index.hnsw.efConstruction = ef_construction
 
             # Add vectors to index
-            # FAISS expects float32 and C-contiguous arrays
-            embeddings_f32 = np.ascontiguousarray(embeddings.astype(np.float32))
-
-            # Normalize embeddings for cosine similarity
-            faiss.normalize_L2(embeddings_f32)
+            # FAISS expects float32, C-contiguous, and L2-normalized arrays for cosine similarity
+            # VectorNormalizer.normalize_l2() handles conversion and normalization
+            embeddings_f32 = VectorNormalizer.normalize_l2(embeddings)
 
             # Add to index
             index.add(embeddings_f32)
@@ -181,7 +197,7 @@ class VectorSearchService:
         except Exception as e:
             logger.error(f"Failed to build FAISS index: {e}")
             msg = f"FAISS index construction failed: {e}"
-            raise RuntimeError(msg) from e
+            raise IndexBuildError(msg) from e
 
     def search(
         self,
@@ -203,8 +219,9 @@ class VectorSearchService:
             Similarity scores are in range [-1, 1] for cosine similarity
 
         Raises:
-            RuntimeError: If index not initialized
-            ValueError: If query embedding has wrong dimension
+            IndexNotInitializedError: If index not initialized
+            IndexValidationError: If query embedding has wrong dimension
+            SearchError: If search operation fails
 
         Example:
             ```python
@@ -214,8 +231,11 @@ class VectorSearchService:
             ```
         """
         if query_embedding.shape[0] != self.dimension:
-            msg = f"Query embedding dimension ({query_embedding.shape[0]}) must match index dimension ({self.dimension})"
-            raise ValueError(msg)
+            msg = (
+                f"Query embedding dimension ({query_embedding.shape[0]}) must match "
+                f"index dimension ({self.dimension})"
+            )
+            raise IndexValidationError(msg)
 
         # Ensure index is loaded
         index = self.index
@@ -231,9 +251,8 @@ class VectorSearchService:
                 index.hnsw.efSearch = ef_search
 
             # Prepare query (reshape to 2D, convert to float32, normalize)
-            # Ensure C-contiguous for FAISS
-            query_f32 = np.ascontiguousarray(query_embedding.astype(np.float32).reshape(1, -1))
-            faiss.normalize_L2(query_f32)
+            # VectorNormalizer.normalize_l2() handles conversion and normalization
+            query_f32 = VectorNormalizer.normalize_l2(query_embedding.reshape(1, -1))
 
             # Search
             distances, indices = index.search(query_f32, actual_k)
@@ -255,14 +274,14 @@ class VectorSearchService:
         except Exception as e:
             logger.error(f"Search failed: {e}")
             msg = f"Vector search failed: {e}"
-            raise RuntimeError(msg) from e
+            raise SearchError(msg) from e
 
     def save_index(self) -> None:
         """
         Save FAISS index and metadata to disk.
 
         Raises:
-            RuntimeError: If index not built or save fails
+            IndexBuildError: If index not built or save fails
 
         Example:
             ```python
@@ -272,7 +291,7 @@ class VectorSearchService:
         """
         if self._index is None:
             msg = "Cannot save: index not built"
-            raise RuntimeError(msg)
+            raise IndexBuildError(msg)
 
         try:
             # Create directory if needed
@@ -298,15 +317,16 @@ class VectorSearchService:
         except Exception as e:
             logger.error(f"Failed to save index: {e}")
             msg = f"Index save failed: {e}"
-            raise RuntimeError(msg) from e
+            raise IndexBuildError(msg) from e
 
     def load_index(self) -> None:
         """
         Load FAISS index and metadata from disk.
 
         Raises:
-            FileNotFoundError: If index files don't exist
-            RuntimeError: If load fails
+            IndexNotFoundError: If index files don't exist
+            IndexValidationError: If loaded index dimension doesn't match
+            IndexBuildError: If load fails
 
         Example:
             ```python
@@ -316,12 +336,18 @@ class VectorSearchService:
             ```
         """
         if not self.index_path.exists():
-            msg = f"FAISS index not found at {self.index_path}. Please build an index first using build_index()."
-            raise FileNotFoundError(msg)
+            msg = (
+                f"FAISS index not found at {self.index_path}. "
+                "Please build an index first using build_index()."
+            )
+            raise IndexNotFoundError(msg)
 
         if not self.metadata_path.exists():
-            msg = f"Metadata not found at {self.metadata_path}. Please build an index first using build_index()."
-            raise FileNotFoundError(msg)
+            msg = (
+                f"Metadata not found at {self.metadata_path}. "
+                "Please build an index first using build_index()."
+            )
+            raise IndexNotFoundError(msg)
 
         try:
             # Load FAISS index
@@ -338,11 +364,17 @@ class VectorSearchService:
 
             # Validate
             if metadata["dimension"] != self.dimension:
-                msg = f"Loaded index dimension ({metadata['dimension']}) doesn't match configured dimension ({self.dimension})"
-                raise ValueError(msg)
+                msg = (
+                    f"Loaded index dimension ({metadata['dimension']}) doesn't match "
+                    f"configured dimension ({self.dimension})"
+                )
+                raise IndexValidationError(msg)
 
             logger.info(f"Successfully loaded index with {self._index_size} vectors")
 
+        except (IndexNotFoundError, IndexValidationError):
+            # Re-raise our custom exceptions without wrapping
+            raise
         except Exception as e:
             logger.error(f"Failed to load index: {e}")
             # Clean up partial state
@@ -350,7 +382,7 @@ class VectorSearchService:
             self._id_map = []
             self._index_size = 0
             msg = f"Index load failed: {e}"
-            raise RuntimeError(msg) from e
+            raise IndexBuildError(msg) from e
 
     def get_index_info(self) -> dict[str, Any]:
         """
@@ -389,11 +421,15 @@ class VectorSearchService:
 
 # Singleton instance for app-wide use
 _vector_search_instance: VectorSearchService | None = None
+_vector_search_lock = threading.Lock()
 
 
 def get_vector_search_service() -> VectorSearchService:
     """
-    Get the singleton vector search service instance.
+    Get the singleton vector search service instance (thread-safe).
+
+    This ensures only one index is loaded in memory across the application,
+    even in multi-threaded environments (e.g., FastAPI with multiple workers).
 
     Returns:
         Shared VectorSearchService instance
@@ -407,7 +443,11 @@ def get_vector_search_service() -> VectorSearchService:
     """
     global _vector_search_instance
 
+    # Double-check locking pattern for thread-safety
     if _vector_search_instance is None:
-        _vector_search_instance = VectorSearchService()
+        with _vector_search_lock:
+            # Check again inside the lock to prevent race conditions
+            if _vector_search_instance is None:
+                _vector_search_instance = VectorSearchService()
 
     return _vector_search_instance

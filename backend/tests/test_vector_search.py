@@ -7,6 +7,7 @@ Tests cover:
 - Index persistence (save/load)
 - Error handling
 - Performance characteristics
+- Singleton pattern for get_vector_search_service()
 """
 
 from pathlib import Path
@@ -15,7 +16,13 @@ import tempfile
 import numpy as np
 import pytest
 
-from app.services.vector_search import VectorSearchService
+from app.services.exceptions import (
+    IndexBuildError,
+    IndexNotFoundError,
+    IndexNotInitializedError,
+    IndexValidationError,
+)
+from app.services.vector_search import VectorSearchService, get_vector_search_service
 
 
 @pytest.fixture()
@@ -81,7 +88,7 @@ class TestVectorSearchServiceInitialization:
 
     def test_index_access_before_build_raises_error(self, vector_service):
         """Test that accessing index before building raises error."""
-        with pytest.raises(RuntimeError, match="Index not initialized"):
+        with pytest.raises(IndexNotInitializedError, match="Index not initialized"):
             _ = vector_service.index
 
 
@@ -112,7 +119,7 @@ class TestIndexBuilding:
         embeddings = np.random.randn(100, 768).astype(np.float32)
         movie_ids = list(range(1, 51))  # Only 50 IDs for 100 embeddings
 
-        with pytest.raises(ValueError, match="must match"):
+        with pytest.raises(IndexValidationError, match="must match"):
             vector_service.build_index(embeddings, movie_ids)
 
     def test_build_index_wrong_dimension_raises_error(self, vector_service):
@@ -120,7 +127,7 @@ class TestIndexBuilding:
         embeddings = np.random.randn(100, 512).astype(np.float32)  # Wrong dimension
         movie_ids = list(range(1, 101))
 
-        with pytest.raises(ValueError, match="dimension"):
+        with pytest.raises(IndexValidationError, match="dimension"):
             vector_service.build_index(embeddings, movie_ids)
 
     def test_build_index_empty_raises_error(self, vector_service):
@@ -205,14 +212,14 @@ class TestSimilaritySearch:
 
         wrong_query = np.random.randn(512).astype(np.float32)  # Wrong dimension
 
-        with pytest.raises(ValueError, match="dimension"):
+        with pytest.raises(IndexValidationError, match="dimension"):
             vector_service.search(wrong_query, k=5)
 
     def test_search_without_index_raises_error(self, vector_service):
         """Test that search without building index raises error."""
         query = np.random.randn(768).astype(np.float32)
 
-        with pytest.raises(RuntimeError, match="Index not initialized"):
+        with pytest.raises(IndexNotInitializedError, match="Index not initialized"):
             vector_service.search(query, k=5)
 
     def test_search_with_different_ef_search(self, vector_service, sample_embeddings):
@@ -246,7 +253,7 @@ class TestIndexPersistence:
 
     def test_save_without_building_raises_error(self, vector_service):
         """Test that saving without building index raises error."""
-        with pytest.raises(RuntimeError, match="Cannot save"):
+        with pytest.raises(IndexBuildError, match="Cannot save"):
             vector_service.save_index()
 
     def test_load_index(self, vector_service, sample_embeddings):
@@ -272,7 +279,7 @@ class TestIndexPersistence:
 
     def test_load_nonexistent_index_raises_error(self, vector_service):
         """Test that loading nonexistent index raises error."""
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(IndexNotFoundError):
             vector_service.load_index()
 
     def test_save_and_load_preserves_search_results(self, vector_service, sample_embeddings):
@@ -342,7 +349,7 @@ class TestIndexInfo:
 
         # Should not be able to search after clearing
         query = embeddings[0]
-        with pytest.raises(RuntimeError):
+        with pytest.raises(IndexNotInitializedError):
             vector_service.search(query, k=5)
 
 
@@ -421,3 +428,84 @@ class TestEdgeCases:
 
         # Should still return results (though they may not be meaningful)
         assert len(results) == 5
+
+
+class TestSingletonPattern:
+    """Test the singleton pattern for get_vector_search_service()."""
+
+    def test_get_vector_search_service_returns_instance(self):
+        """Test that get_vector_search_service returns a VectorSearchService instance."""
+        import app.services.vector_search as vs_module
+
+        # Reset singleton for clean test
+        vs_module._vector_search_instance = None
+
+        service = get_vector_search_service()
+
+        assert isinstance(service, VectorSearchService)
+        assert service.dimension == 768  # Default from config
+
+    def test_get_vector_search_service_singleton(self):
+        """Test that get_vector_search_service returns the same instance."""
+        import app.services.vector_search as vs_module
+
+        # Reset singleton for clean test
+        vs_module._vector_search_instance = None
+
+        service1 = get_vector_search_service()
+        service2 = get_vector_search_service()
+
+        # Should return the exact same instance
+        assert service1 is service2
+
+    def test_singleton_persists_across_calls(self):
+        """Test that singleton instance persists state across multiple calls."""
+        import app.services.vector_search as vs_module
+
+        # Reset singleton for clean test
+        vs_module._vector_search_instance = None
+
+        service1 = get_vector_search_service()
+        original_dimension = service1.dimension
+
+        # Get service again
+        service2 = get_vector_search_service()
+
+        # Should have same dimension (same instance)
+        assert service2.dimension == original_dimension
+        assert service1 is service2
+
+    def test_singleton_multiple_calls_efficiency(self):
+        """Test that singleton doesn't create new instances on repeated calls."""
+        import app.services.vector_search as vs_module
+
+        # Reset singleton for clean test
+        vs_module._vector_search_instance = None
+
+        # Get service multiple times
+        services = [get_vector_search_service() for _ in range(10)]
+
+        # All should be the same instance
+        first_service = services[0]
+        for service in services[1:]:
+            assert service is first_service
+
+    def test_singleton_reset_cleanup(self):
+        """Test cleanup: Reset singleton after test to avoid side effects."""
+        import app.services.vector_search as vs_module
+
+        # This test ensures we can reset the singleton for testing purposes
+        vs_module._vector_search_instance = None
+
+        service1 = get_vector_search_service()
+        assert service1 is not None
+
+        # Reset
+        vs_module._vector_search_instance = None
+
+        # New call should create a new instance
+        service2 = get_vector_search_service()
+        assert service2 is not None
+
+        # Note: In actual usage, these would be the same instance
+        # This test just verifies we can reset for testing purposes

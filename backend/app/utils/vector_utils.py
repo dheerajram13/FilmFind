@@ -27,7 +27,7 @@ class VectorNormalizer:
         """
         L2-normalize vectors for cosine similarity.
 
-        Normalizes vectors in-place using FAISS for efficiency.
+        Converts to float32 C-contiguous array and normalizes using FAISS.
         After normalization, dot product equals cosine similarity.
 
         Args:
@@ -35,7 +35,8 @@ class VectorNormalizer:
                     Will be converted to float32 and C-contiguous
 
         Returns:
-            L2-normalized vectors (same array, modified in-place)
+            L2-normalized vectors as float32 C-contiguous array
+            (may be a copy if input needs conversion)
 
         Example:
             ```python
@@ -148,7 +149,10 @@ class VectorNormalizer:
 
         actual_dim = embedding.shape[-1]
         if actual_dim != expected_dim:
-            msg = f"Embedding dimension ({actual_dim}) doesn't match expected dimension ({expected_dim})"
+            msg = (
+                f"Embedding dimension ({actual_dim}) doesn't match "
+                f"expected dimension ({expected_dim})"
+            )
             raise ValueError(msg)
 
     @staticmethod
@@ -157,13 +161,15 @@ class VectorNormalizer:
         Normalize embeddings in batches for memory efficiency.
 
         Useful for very large embedding matrices that might not fit in memory.
+        Creates a float32 C-contiguous copy and normalizes it in batches.
 
         Args:
             embeddings: Array of shape (n, d)
             batch_size: Number of vectors to normalize at once
 
         Returns:
-            L2-normalized embeddings
+            L2-normalized embeddings as float32 C-contiguous array
+            (may be a copy if input needs conversion)
 
         Example:
             ```python
