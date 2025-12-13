@@ -206,3 +206,104 @@ class BatchProcessingError(FilmFindServiceError):
         self.batch_size = batch_size
         self.failed_items = failed_items
         super().__init__(message)
+
+
+# ============================================================================
+# LLM Service Exceptions
+# ============================================================================
+
+
+class LLMError(FilmFindServiceError):
+    """
+    Base exception for all LLM service errors.
+
+    Exception Hierarchy:
+    - LLMError (base)
+      ├── LLMRetriableError (can be retried)
+      │   ├── LLMClientError (HTTP errors, timeouts, etc.)
+      │   └── LLMInvalidResponseError (malformed JSON)
+      └── LLMNonRetriableError (should NOT be retried)
+          └── LLMRateLimitError (HTTP 429)
+
+    Design Pattern:
+    The retry decorator should only catch LLMRetriableError and its subclasses.
+    LLMNonRetriableError and its subclasses will propagate immediately.
+    """
+
+
+class LLMRetriableError(LLMError):
+    """
+    Base class for LLM errors that can be retried.
+
+    These errors are typically transient and may succeed on retry:
+    - Network errors
+    - Temporary server errors (5xx)
+    - Timeouts
+    - Malformed responses (might be LLM hallucination)
+    """
+
+
+class LLMNonRetriableError(LLMError):
+    """
+    Base class for LLM errors that should NOT be retried.
+
+    These errors will not be resolved by retrying:
+    - Rate limits (need backoff at application level)
+    - Authentication errors
+    - Invalid API keys
+    """
+
+
+class LLMClientError(LLMRetriableError):
+    """
+    Exception for retriable LLM client errors.
+
+    Raised when LLM API calls fail due to:
+    - HTTP errors (5xx server errors)
+    - Connection errors
+    - Timeout errors
+    - Unexpected provider errors
+
+    Note: This exception is caught by retry logic and will be retried
+    with exponential backoff.
+    """
+
+
+class LLMRateLimitError(LLMNonRetriableError):
+    """
+    Exception for rate limit errors (HTTP 429).
+
+    Raised when LLM API rate limits are exceeded.
+    This exception is NOT caught by retry logic and will propagate
+    immediately to the caller.
+
+    Rationale: Retrying rate-limited requests will just hit the same
+    limit. The application should implement proper backoff or queuing
+    at a higher level.
+
+    Example handling:
+        try:
+            result = llm_client.generate_completion(prompt)
+        except LLMRateLimitError:
+            # Wait before retrying at application level
+            time.sleep(60)
+            result = llm_client.generate_completion(prompt)
+    """
+
+
+class LLMInvalidResponseError(LLMRetriableError):
+    """
+    Exception for invalid or malformed LLM responses.
+
+    Raised when:
+    - Response JSON is invalid
+    - Response structure doesn't match expected format
+    - Required fields are missing
+
+    Note: Classified as retriable because:
+    1. LLMs can occasionally hallucinate malformed JSON
+    2. Retrying with a lower temperature might help
+    3. The error might be transient
+
+    However, if retries consistently fail, the prompt may need adjustment.
+    """
