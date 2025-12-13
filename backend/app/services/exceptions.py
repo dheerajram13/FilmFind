@@ -206,3 +206,50 @@ class BatchProcessingError(FilmFindServiceError):
         self.batch_size = batch_size
         self.failed_items = failed_items
         super().__init__(message)
+
+
+# ============================================================================
+# LLM Service Exceptions
+# ============================================================================
+
+
+class LLMError(FilmFindServiceError):
+    """Base exception for LLM service errors."""
+
+
+class LLMClientError(LLMError):
+    """
+    Exception for LLM client errors.
+
+    Raised when LLM API calls fail due to:
+    - HTTP errors (4xx, 5xx)
+    - Connection errors
+    - Timeout errors
+    - Unexpected provider errors
+
+    Note: This exception supports retry logic.
+    """
+
+
+class LLMRateLimitError(LLMError):
+    """
+    Exception for rate limit errors (HTTP 429).
+
+    Raised when LLM API rate limits are exceeded.
+    This exception should NOT be retried automatically,
+    as retrying will continue to hit rate limits.
+
+    Application should implement backoff or queuing logic
+    at a higher level when catching this exception.
+    """
+
+
+class LLMInvalidResponseError(LLMError):
+    """
+    Exception for invalid or malformed LLM responses.
+
+    Raised when:
+    - Response JSON is invalid
+    - Response structure doesn't match expected format
+    - Required fields are missing
+    """
