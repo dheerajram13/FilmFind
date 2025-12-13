@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 CLI tool for testing the Query Parser (Module 2.1)
 

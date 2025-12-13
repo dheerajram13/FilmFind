@@ -36,18 +36,35 @@ def extract_json_from_markdown(text: str) -> str:
     """
     text = text.strip()
 
-    # Try extracting from ```json blocks
+    # Try extracting from ```json blocks (first occurrence only)
     if "```json" in text:
         try:
-            return text.split("```json")[1].split("```")[0].strip()
-        except IndexError:
+            # Find the first ```json block
+            start_marker = "```json"
+            end_marker = "```"
+            start_idx = text.find(start_marker) + len(start_marker)
+            end_idx = text.find(end_marker, start_idx)
+
+            if end_idx != -1:
+                return text[start_idx:end_idx].strip()
+        except (ValueError, IndexError):
             pass  # Fall through to next method
 
-    # Try extracting from ``` blocks
+    # Try extracting from ``` blocks (first occurrence only)
     if "```" in text:
         try:
-            return text.split("```")[1].split("```")[0].strip()
-        except IndexError:
+            # Find the first ``` block
+            marker = "```"
+            start_idx = text.find(marker) + len(marker)
+            # Skip the language identifier if present (e.g., ```python)
+            newline_idx = text.find("\n", start_idx)
+            if newline_idx != -1 and newline_idx - start_idx < 20:
+                start_idx = newline_idx + 1
+
+            end_idx = text.find(marker, start_idx)
+            if end_idx != -1:
+                return text[start_idx:end_idx].strip()
+        except (ValueError, IndexError):
             pass  # Fall through to plain text
 
     # Return as-is (assume plain JSON)

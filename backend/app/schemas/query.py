@@ -5,10 +5,10 @@ This module defines Pydantic models for representing parsed query information,
 including intents, constraints, themes, tones, and reference titles.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MediaType(str, Enum):
@@ -64,7 +64,18 @@ class QueryConstraints(BaseModel):
 
     # Year constraints
     year_min: int | None = Field(default=None, description="Minimum release year", ge=1900)
-    year_max: int | None = Field(default=None, description="Maximum release year")
+    year_max: int | None = Field(default=None, description="Maximum release year", ge=1900)
+
+    @field_validator("year_max")
+    @classmethod
+    def validate_year_range(cls, v: int | None, info) -> int | None:
+        """Validate that year_max >= year_min when both are provided."""
+        if v is not None and info.data.get("year_min") is not None:
+            year_min = info.data["year_min"]
+            if v < year_min:
+                msg = f"year_max ({v}) must be >= year_min ({year_min})"
+                raise ValueError(msg)
+        return v
 
     # Rating constraints
     rating_min: float | None = Field(
@@ -144,7 +155,8 @@ class ParsedQuery(BaseModel):
 
     # Metadata
     parsed_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Timestamp when query was parsed"
+        default_factory=lambda: datetime.now(UTC),
+        description="Timestamp when query was parsed",
     )
     confidence_score: float = Field(
         default=1.0, description="Parser confidence (0-1)", ge=0.0, le=1.0

@@ -179,11 +179,28 @@ class TestRuleBasedParser:
         with patch.object(
             query_parser.llm_client, "generate_json", side_effect=LLMClientError("LLM failed")
         ):
+            # Single reference title
             parsed = query_parser.parse("Movies like Interstellar with space themes")
-
             assert parsed.parsing_method == "rule-based"
             assert "Interstellar" in parsed.intent.reference_titles
             assert parsed.intent.is_comparison_query is True
+
+            # Multiple titles with "and"
+            parsed = query_parser.parse("movies like Star Wars and Interstellar")
+            assert "Star Wars" in parsed.intent.reference_titles
+            assert "Interstellar" in parsed.intent.reference_titles
+            assert len(parsed.intent.reference_titles) >= 2
+
+            # Multiple titles with comma
+            parsed = query_parser.parse("shows similar to Friends, The Office")
+            assert any("Friends" in title for title in parsed.intent.reference_titles)
+            assert any("Office" in title for title in parsed.intent.reference_titles)
+
+            # Multiple titles with "and" and comma
+            parsed = query_parser.parse("movies like Inception, Interstellar and The Matrix")
+            assert any("Inception" in title for title in parsed.intent.reference_titles)
+            assert any("Interstellar" in title for title in parsed.intent.reference_titles)
+            assert any("Matrix" in title for title in parsed.intent.reference_titles)
 
     def test_parse_tones(self, query_parser):
         """Test detecting tones from query"""
@@ -258,12 +275,31 @@ class TestRuleBasedParser:
             assert parsed.constraints.year_max == 2020
 
     def test_parse_undesired_elements(self, query_parser):
-        """Test detecting undesired elements"""
+        """Test detecting undesired elements with various negative patterns"""
         with patch.object(
             query_parser.llm_client, "generate_json", side_effect=LLMClientError("LLM failed")
         ):
+            # Test "without X"
             parsed = query_parser.parse("action movies without romance")
             assert "romance" in parsed.intent.undesired_themes
+
+            # Test "with less X"
+            parsed = query_parser.parse("sci-fi like Interstellar with less romance")
+            assert "romance" in parsed.intent.undesired_themes
+
+            # Test "no X"
+            parsed = query_parser.parse("thriller with no violence")
+            assert "violence" in parsed.intent.undesired_themes
+
+            # Test "avoid X"
+            parsed = query_parser.parse("horror movies avoid jump scares")
+            assert any(
+                "jump" in theme or "scares" in theme for theme in parsed.intent.undesired_themes
+            )
+
+            # Test "less X" standalone
+            parsed = query_parser.parse("comedy less slapstick")
+            assert "slapstick" in parsed.intent.undesired_themes
 
 
 # --- LLM-Based Parser Tests (Mocked) ---
@@ -326,6 +362,205 @@ class TestLLMParser:
             ):
                 with pytest.raises(LLMClientError):
                     parser.parse("action movies")
+
+    def test_parse_with_llm_multiple_negative_patterns(self, query_parser):
+        """Test LLM parsing extracts multiple types of negative patterns"""
+        mock_response = {
+            "themes": ["suspense", "mystery"],
+            "tones": ["suspenseful"],
+            "emotions": ["thrill"],
+            "reference_titles": [],
+            "keywords": ["thriller", "psychological"],
+            "plot_elements": [],
+            "undesired_themes": ["jump scares", "violence", "gore"],
+            "undesired_tones": ["comedic"],
+            "is_comparison_query": False,
+            "is_mood_query": True,
+            "media_type": "movie",
+            "genres": ["Thriller"],
+            "exclude_genres": [],
+            "languages": [],
+            "year_min": None,
+            "year_max": None,
+            "rating_min": None,
+            "runtime_min": None,
+            "runtime_max": None,
+            "streaming_providers": [],
+            "popular_only": False,
+            "hidden_gems": False,
+            "search_text": "suspense mystery psychological thriller",
+        }
+
+        with patch.object(query_parser.llm_client, "generate_json", return_value=mock_response):
+            parsed = query_parser.parse("thriller without jump scares, no violence and avoid gore")
+
+            assert parsed.parsing_method == "llm"
+            assert "jump scares" in parsed.intent.undesired_themes
+            assert "violence" in parsed.intent.undesired_themes
+            assert "gore" in parsed.intent.undesired_themes
+            assert ToneType.COMEDIC in parsed.intent.undesired_tones
+
+    def test_parse_with_llm_invalid_tone_values(self, query_parser):
+        """Test LLM parsing gracefully handles invalid tone enum values"""
+        mock_response = {
+            "themes": ["action", "adventure"],
+            "tones": [
+                "dark",
+                "invalid_tone",
+                "serious",
+                "made_up_tone",
+            ],  # Mix of valid and invalid
+            "emotions": ["awe"],
+            "reference_titles": [],
+            "keywords": ["action"],
+            "plot_elements": [],
+            "undesired_themes": [],
+            "undesired_tones": ["light", "bad_tone"],  # Mix of valid and invalid
+            "is_comparison_query": False,
+            "is_mood_query": False,
+            "media_type": "movie",
+            "genres": ["Action"],
+            "exclude_genres": [],
+            "languages": [],
+            "year_min": None,
+            "year_max": None,
+            "rating_min": None,
+            "runtime_min": None,
+            "runtime_max": None,
+            "streaming_providers": [],
+            "popular_only": False,
+            "hidden_gems": False,
+            "search_text": "action adventure dark serious",
+        }
+
+        with patch.object(query_parser.llm_client, "generate_json", return_value=mock_response):
+            parsed = query_parser.parse("dark serious action movies")
+
+            # Should only contain valid tone values (as strings due to use_enum_values=True)
+            assert "dark" in parsed.intent.tones
+            assert "serious" in parsed.intent.tones
+            # Invalid tones should be skipped - only 2 valid tones
+            assert len(parsed.intent.tones) == 2
+
+            # Same for undesired tones
+            assert "light" in parsed.intent.undesired_tones
+            # Invalid undesired tone should be skipped - only 1 valid tone
+            assert len(parsed.intent.undesired_tones) == 1
+
+    def test_parse_with_llm_invalid_emotion_values(self, query_parser):
+        """Test LLM parsing gracefully handles invalid emotion enum values"""
+        mock_response = {
+            "themes": ["horror", "suspense"],
+            "tones": ["dark"],
+            "emotions": ["fear", "invalid_emotion", "thrill", "nonsense_emotion", "joy"],  # Mix
+            "reference_titles": [],
+            "keywords": ["horror"],
+            "plot_elements": [],
+            "undesired_themes": [],
+            "undesired_tones": [],
+            "is_comparison_query": False,
+            "is_mood_query": True,
+            "media_type": "movie",
+            "genres": ["Horror"],
+            "exclude_genres": [],
+            "languages": [],
+            "year_min": None,
+            "year_max": None,
+            "rating_min": None,
+            "runtime_min": None,
+            "runtime_max": None,
+            "streaming_providers": [],
+            "popular_only": False,
+            "hidden_gems": False,
+            "search_text": "horror suspense fear thrill",
+        }
+
+        with patch.object(query_parser.llm_client, "generate_json", return_value=mock_response):
+            parsed = query_parser.parse("scary thriller that makes you afraid")
+
+            # Should only contain valid emotion values (as strings due to use_enum_values=True)
+            assert "fear" in parsed.intent.emotions
+            assert "thrill" in parsed.intent.emotions
+            assert "joy" in parsed.intent.emotions
+            # Invalid emotions should be skipped - should have exactly 3 valid emotions
+            assert len(parsed.intent.emotions) == 3
+
+    def test_parse_with_llm_all_invalid_enum_values(self, query_parser):
+        """Test LLM parsing when ALL enum values are invalid"""
+        mock_response = {
+            "themes": ["action"],
+            "tones": ["completely_invalid", "not_a_tone", "fake_tone"],  # All invalid
+            "emotions": ["not_real", "made_up"],  # All invalid
+            "reference_titles": [],
+            "keywords": ["action"],
+            "plot_elements": [],
+            "undesired_themes": [],
+            "undesired_tones": ["also_invalid", "wrong_tone"],  # All invalid
+            "is_comparison_query": False,
+            "is_mood_query": False,
+            "media_type": "movie",
+            "genres": ["Action"],
+            "exclude_genres": [],
+            "languages": [],
+            "year_min": None,
+            "year_max": None,
+            "rating_min": None,
+            "runtime_min": None,
+            "runtime_max": None,
+            "streaming_providers": [],
+            "popular_only": False,
+            "hidden_gems": False,
+            "search_text": "action",
+        }
+
+        with patch.object(query_parser.llm_client, "generate_json", return_value=mock_response):
+            parsed = query_parser.parse("action movies")
+
+            # All invalid enum values should result in empty lists
+            assert parsed.intent.tones == []
+            assert parsed.intent.emotions == []
+            assert parsed.intent.undesired_tones == []
+            # Other fields should still be populated
+            assert "action" in parsed.intent.themes
+            assert "Action" in parsed.constraints.genres
+
+    def test_parse_with_llm_empty_enum_lists(self, query_parser):
+        """Test LLM parsing when enum lists are empty"""
+        mock_response = {
+            "themes": ["mystery"],
+            "tones": [],  # Empty
+            "emotions": [],  # Empty
+            "reference_titles": [],
+            "keywords": ["mystery"],
+            "plot_elements": [],
+            "undesired_themes": [],
+            "undesired_tones": [],  # Empty
+            "is_comparison_query": False,
+            "is_mood_query": False,
+            "media_type": "movie",
+            "genres": ["Mystery"],
+            "exclude_genres": [],
+            "languages": [],
+            "year_min": None,
+            "year_max": None,
+            "rating_min": None,
+            "runtime_min": None,
+            "runtime_max": None,
+            "streaming_providers": [],
+            "popular_only": False,
+            "hidden_gems": False,
+            "search_text": "mystery",
+        }
+
+        with patch.object(query_parser.llm_client, "generate_json", return_value=mock_response):
+            parsed = query_parser.parse("mystery movies")
+
+            # Empty lists should remain empty
+            assert parsed.intent.tones == []
+            assert parsed.intent.emotions == []
+            assert parsed.intent.undesired_tones == []
+            # Other fields should still work
+            assert "mystery" in parsed.intent.themes
 
 
 # --- Edge Cases and Error Handling ---

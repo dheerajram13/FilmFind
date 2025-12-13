@@ -8,7 +8,7 @@ Parses natural language queries to extract:
 
 Supports:
 - LLM-based parsing (Groq/Ollama)
-- Rule-based fallback (spaCy)
+- Regex-based fallback for reliability
 - Caching for performance
 """
 
@@ -32,7 +32,7 @@ class QueryParser:
     """
     Main query parser that extracts intent and constraints from natural language.
 
-    Uses LLM for deep understanding with rule-based fallback for reliability.
+    Uses LLM for deep understanding with regex-based pattern matching fallback for reliability.
     """
 
     def __init__(
@@ -82,8 +82,8 @@ class QueryParser:
             if not self.config.enable_fallback:
                 raise
 
-        # Fallback to rule-based parsing
-        logger.info("Falling back to rule-based parsing")
+        # Fallback to regex-based parsing
+        logger.info("Falling back to regex-based parsing")
         return self._parse_with_rules(query)
 
     def _parse_with_llm(self, query: str) -> ParsedQuery:
@@ -103,7 +103,27 @@ Extract structured information from user queries including:
 - Emotions (joy, fear, sadness, awe, thrill, hope, romance, dark_tone)
 - Reference titles (movies/shows mentioned)
 - Constraints (language, year, genre, etc.)
-- Undesired elements (things user wants to avoid)
+- Undesired elements (things user wants to avoid or minimize)
+
+CRITICAL: Pay careful attention to negative/exclusion patterns in the query.
+Extract undesired elements by looking for:
+1. "with less X" / "with fewer X" → extract X as undesired
+2. "without X" / "with no X" → extract X as undesired
+3. "no X" / "avoid X" / "not X" → extract X as undesired
+4. "less X" / "fewer X" (standalone) → extract X as undesired
+5. "minus the X" / "but without X" → extract X as undesired
+
+Examples of undesired element extraction:
+- "with less romance" → undesired_themes: ["romance"]
+- "without violence" → undesired_themes: ["violence"]
+- "no horror elements" → undesired_themes: ["horror", "horror elements"]
+- "less dark tone" → undesired_tones: ["dark"]
+- "avoid jump scares" → undesired_themes: ["jump scares"]
+- "but without the comedy" → undesired_themes: ["comedy"]
+
+When categorizing undesired elements:
+- If it's a tone (dark, light, serious, comedic, etc.) → add to undesired_tones
+- Otherwise → add to undesired_themes
 
 Respond with valid JSON only."""
 
@@ -145,7 +165,7 @@ Examples:
    - tones: ["dark", "serious"]
    - emotions: ["awe", "dark_tone"]
    - reference_titles: ["Interstellar"]
-   - undesired_themes: ["romance"]
+   - undesired_themes: ["romance"]  # "with less romance" indicates romance should be avoided
    - genres: ["Science Fiction"]
    - search_text: "dark science fiction space exploration time dilation cosmic themes"
 
@@ -167,6 +187,14 @@ Examples:
    - genres: ["Action"]
    - search_text: "action heroism intense fight sequences"
 
+4. Query: "thriller without jump scares and no violence"
+   - themes: ["suspense", "mystery"]
+   - tones: ["suspenseful"]
+   - emotions: ["thrill"]
+   - undesired_themes: ["jump scares", "violence"]  # "without" and "no" indicate avoidance
+   - genres: ["Thriller"]
+   - search_text: "suspense mystery psychological thriller"
+
 Now parse the query and respond with JSON only."""
 
         # Generate JSON response
@@ -177,29 +205,28 @@ Now parse the query and respond with JSON only."""
             max_tokens=1024,
         )
 
+        # Helper function to safely parse enum values
+        def parse_enum_values(values: list[str], enum_class):
+            """Parse list of strings to enum values, skipping invalid ones."""
+            result = []
+            for v in values:
+                try:
+                    result.append(enum_class(v))
+                except ValueError:
+                    logger.warning(f"Invalid {enum_class.__name__} value: {v}")
+            return result
+
         # Build QueryIntent
         intent = QueryIntent(
             raw_query=query,
             themes=response_json.get("themes", []),
-            tones=[
-                ToneType(t)
-                for t in response_json.get("tones", [])
-                if t in ToneType.__members__.values()
-            ],
-            emotions=[
-                EmotionType(e)
-                for e in response_json.get("emotions", [])
-                if e in EmotionType.__members__.values()
-            ],
+            tones=parse_enum_values(response_json.get("tones", []), ToneType),
+            emotions=parse_enum_values(response_json.get("emotions", []), EmotionType),
             reference_titles=response_json.get("reference_titles", []),
             keywords=response_json.get("keywords", []),
             plot_elements=response_json.get("plot_elements", []),
             undesired_themes=response_json.get("undesired_themes", []),
-            undesired_tones=[
-                ToneType(t)
-                for t in response_json.get("undesired_tones", [])
-                if t in ToneType.__members__.values()
-            ],
+            undesired_tones=parse_enum_values(response_json.get("undesired_tones", []), ToneType),
             is_comparison_query=response_json.get("is_comparison_query", False),
             is_mood_query=response_json.get("is_mood_query", False),
         )
@@ -234,7 +261,7 @@ Now parse the query and respond with JSON only."""
 
     def _parse_with_rules(self, query: str) -> ParsedQuery:
         """
-        Parse query using rule-based approach (fallback).
+        Parse query using regex-based pattern matching (fallback).
 
         Args:
             query: User query
@@ -246,12 +273,24 @@ Now parse the query and respond with JSON only."""
 
         # Extract reference titles (look for "like X" patterns)
         reference_titles = []
+        # First, find the phrase after "like/similar to/such as"
+        # Include "and" in the character class so it captures multiple titles
         like_pattern = (
-            r"(?:like|similar to|such as)\s+([A-Z][A-Za-z0-9\s:]+?)"
-            r"(?:\s+(?:but|with|without|and|or|,)|$)"
+            r"(?:like|similar to|such as)\s+"
+            r"([A-Z][A-Za-z0-9\s:,and]+?)"
+            r"(?:\s+(?:but|with|without|from|in|on|that)\s|\s*$)"
         )
         matches = re.findall(like_pattern, query, re.IGNORECASE)
-        reference_titles.extend([m.strip() for m in matches])
+
+        # Process each match to split on "and" or "," to handle multiple titles
+        for match in matches:
+            # Split by comma or " and " (with surrounding spaces)
+            titles = re.split(r",\s*|\s+and\s+", match, flags=re.IGNORECASE)
+            for title in titles:
+                cleaned = title.strip()
+                # Filter out very short titles and common stop words
+                if cleaned and len(cleaned) > 1 and cleaned.lower() not in {"the", "a", "an"}:
+                    reference_titles.append(cleaned)
 
         # Detect tones
         tones = []
@@ -328,11 +367,17 @@ Now parse the query and respond with JSON only."""
             year_min = int(match.group(1))
             year_max = int(match.group(2))
 
-        # Detect undesired elements (look for "less X", "without X", "no X")
+        # Detect undesired elements (look for "with less X", "without X", "no X", etc.)
         undesired_themes = []
-        undesired_pattern = r"(?:less|without|no)\s+(\w+)"
-        matches = re.findall(undesired_pattern, query_lower)
-        undesired_themes.extend([m.strip() for m in matches])
+        # Pattern captures multi-word phrases after negation markers
+        undesired_patterns = [
+            r"(?:with\s+)?(?:less|fewer)\s+([a-z\s]+?)(?:\s+(?:and|or|but|with|,)|$)",
+            r"(?:with(?:out)?|avoid|minus)\s+(?:the\s+)?([a-z\s]+?)(?:\s+(?:and|or|but|with|,)|$)",
+            r"\bno\s+([a-z\s]+?)(?:\s+(?:and|or|but|with|elements|scenes|,)|$)",
+        ]
+        for pattern in undesired_patterns:
+            matches = re.findall(pattern, query_lower)
+            undesired_themes.extend([m.strip() for m in matches if m.strip()])
 
         # Extract basic keywords (remove stop words)
         stop_words = {

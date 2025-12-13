@@ -17,6 +17,7 @@ from app.services.exceptions import (
     LLMClientError,
     LLMInvalidResponseError,
     LLMRateLimitError,
+    LLMRetriableError,
 )
 from app.utils.json_utils import safe_json_parse
 from app.utils.retry import retry_with_backoff
@@ -95,23 +96,18 @@ class LLMClient:
             LLMClientError: If request fails
             LLMRateLimitError: If rate limit is hit
         """
-        # Don't retry rate limit errors - they should be handled at app level
-        try:
-            if self.provider == "groq":
-                return self._groq_completion_with_retry(
-                    prompt, system_prompt, temperature, max_tokens, response_format
-                )
-            if self.provider == "ollama":
-                return self._ollama_completion_with_retry(
-                    prompt, system_prompt, temperature, max_tokens
-                )
-            msg = f"Unsupported provider: {self.provider}"
-            raise LLMClientError(msg)
-        except LLMRateLimitError:
-            # Don't retry rate limits - re-raise immediately
-            raise
+        if self.provider == "groq":
+            return self._groq_completion_with_retry(
+                prompt, system_prompt, temperature, max_tokens, response_format
+            )
+        if self.provider == "ollama":
+            return self._ollama_completion_with_retry(
+                prompt, system_prompt, temperature, max_tokens
+            )
+        msg = f"Unsupported provider: {self.provider}"
+        raise LLMClientError(msg)
 
-    @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMClientError,))
+    @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMRetriableError,))
     def _groq_completion_with_retry(
         self,
         prompt: str,
@@ -120,7 +116,12 @@ class LLMClient:
         max_tokens: int,
         response_format: dict[str, Any] | None,
     ) -> str:
-        """Wrapper with retry logic"""
+        """
+        Wrapper with retry logic for Groq completions.
+
+        Only catches LLMRetriableError (LLMClientError, LLMInvalidResponseError).
+        LLMRateLimitError inherits from LLMNonRetriableError and will propagate.
+        """
         return self._groq_completion(
             prompt, system_prompt, temperature, max_tokens, response_format
         )
@@ -188,7 +189,7 @@ class LLMClient:
             msg = f"Unexpected error: {e}"
             raise LLMClientError(msg) from e
 
-    @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMClientError,))
+    @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMRetriableError,))
     def _ollama_completion_with_retry(
         self,
         prompt: str,
@@ -196,7 +197,12 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        """Wrapper with retry logic"""
+        """
+        Wrapper with retry logic for Ollama completions.
+
+        Only catches LLMRetriableError (LLMClientError, LLMInvalidResponseError).
+        LLMRateLimitError inherits from LLMNonRetriableError and will propagate.
+        """
         return self._ollama_completion(prompt, system_prompt, temperature, max_tokens)
 
     def _ollama_completion(
