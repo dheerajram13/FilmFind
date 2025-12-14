@@ -4,10 +4,13 @@
 
 FilmFind is a cutting-edge AI-powered movie and TV series recommendation system that understands natural language queries, interprets emotional intent, and delivers personalized recommendations using semantic search, hybrid embeddings, and LLM-powered re-ranking.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![GitHub last commit](https://img.shields.io/github/last-commit/dheerajram13/FilmFind)](https://github.com/dheerajram13/FilmFind/commits)
+
 
 ---
 
@@ -112,7 +115,7 @@ User Query → NLP Understanding → Semantic Retrieval → Multi-Signal Scoring
 
 ### High-Level Architecture
 
-![System Architecture](images/System%20Archeitecture.png)
+![System Architecture](images/System%20Architecture.png)
 
 ### Key Components
 
@@ -744,6 +747,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [FastAPI](https://fastapi.tiangolo.com/) for the amazing Python framework
 - [Next.js](https://nextjs.org/) for the powerful React framework
 - [ShadCN UI](https://ui.shadcn.com/) for beautiful UI components
+
+---
+
+👨‍💻 Author
+
+**Dheeraj Srirama**
+- 🌐 Portfolio: [dheerajsrirama.netlify.app](https://dheerajsrirama.netlify.app/)
+- 💼 LinkedIn: [dheerajsrirama](https://linkedin.com/in/dheerajsrirama)
+- 🐙 GitHub: [@dheerajram13](https://github.com/dheerajram13)
+- 📧 Email: sriramadheeraj@gmail.com
 
 ---
 
