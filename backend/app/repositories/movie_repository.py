@@ -446,6 +446,30 @@ class MovieRepository(BaseRepository[Movie]):
     # Bulk Operations
     # =============================================================================
 
+    def find_by_ids(
+        self, movie_ids: list[int], eager_load_relations: bool = True
+    ) -> list[Movie]:
+        """
+        Get multiple movies by internal database IDs (bulk fetch).
+
+        Args:
+            movie_ids: List of internal movie IDs
+            eager_load_relations: Whether to eagerly load genres, keywords, cast
+
+        Returns:
+            List of movies (may be fewer than input if some don't exist)
+        """
+        query = self.db.query(Movie).filter(Movie.id.in_(movie_ids))
+
+        if eager_load_relations:
+            query = query.options(
+                selectinload(Movie.genres),
+                selectinload(Movie.keywords),
+                selectinload(Movie.cast_members),
+            )
+
+        return query.all()
+
     def get_by_tmdb_ids(self, tmdb_ids: list[int]) -> list[Movie]:
         """
         Get multiple movies by TMDB IDs (bulk fetch).
