@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Query pattern keywords for adaptive strategy
 TRENDING_KEYWORDS = frozenset(["trending", "popular", "most watched"])
-RECENT_KEYWORDS = frozenset(["new", "recent", "latest", "2024", "2025"])
+RECENT_KEYWORDS = frozenset(["new", "recent", "latest", "this year", "current"])
 QUALITY_KEYWORDS = frozenset(["best", "top rated", "critically acclaimed", "masterpiece"])
 
 
@@ -268,11 +268,14 @@ class MultiSignalScoringEngine:
         # Sort by final score (descending)
         scored_candidates.sort(key=lambda x: x.get("final_score", 0.0), reverse=True)
 
-        logger.info(
-            "Scoring complete. Top score: %.3f, Bottom score: %.3f",
-            scored_candidates[0].get("final_score", 0.0),
-            scored_candidates[-1].get("final_score", 0.0),
-        )
+        if scored_candidates:
+            logger.info(
+                "Scoring complete. Top score: %.3f, Bottom score: %.3f",
+                scored_candidates[0].get("final_score", 0.0),
+                scored_candidates[-1].get("final_score", 0.0),
+            )
+        else:
+            logger.info("Scoring complete. No candidates scored.")
 
         return scored_candidates
 
@@ -297,37 +300,22 @@ class MultiSignalScoringEngine:
         Returns:
             Movie with 'final_score' (and optionally 'signal_scores')
         """
-        signal_scores = {}
+        # Extract all signals dynamically (eliminates code duplication)
+        signal_scores = {
+            signal_name: extractor.extract(movie, parsed_query, context)
+            for signal_name, extractor in self.extractors.items()
+        }
 
-        # Extract each signal
-        signal_scores["semantic_similarity"] = self.extractors["semantic_similarity"].extract(
-            movie, parsed_query, context
+        # Get weights as dict for dynamic calculation
+        weights_dict = weights.to_dict()
+
+        # Calculate weighted composite score dynamically
+        final_score = sum(
+            weights_dict[signal_name] * signal_scores[signal_name] for signal_name in signal_scores
         )
 
-        signal_scores["genre_keyword_match"] = self.extractors["genre_keyword_match"].extract(
-            movie, parsed_query, context
-        )
-
-        signal_scores["popularity"] = self.extractors["popularity"].extract(
-            movie, parsed_query, context
-        )
-
-        signal_scores["rating_quality"] = self.extractors["rating_quality"].extract(
-            movie, parsed_query, context
-        )
-
-        signal_scores["recency"] = self.extractors["recency"].extract(movie, parsed_query, context)
-
-        # Calculate weighted composite score
-        final_score = (
-            weights.semantic_similarity * signal_scores["semantic_similarity"]
-            + weights.genre_keyword_match * signal_scores["genre_keyword_match"]
-            + weights.popularity * signal_scores["popularity"]
-            + weights.rating_quality * signal_scores["rating_quality"]
-            + weights.recency * signal_scores["recency"]
-        )
-
-        # Add scores to movie
+        # Add scores to movie (mutates input dict - this is intentional
+        # to enrich candidates with scores for downstream processing)
         movie["final_score"] = final_score
         if include_breakdown:
             movie["signal_scores"] = signal_scores
@@ -377,7 +365,7 @@ class AdaptiveScoringStrategy:
             Appropriate ScoringWeights for the query type
         """
         intent = parsed_query.intent
-        query_lower = parsed_query.raw_query.lower()
+        query_lower = intent.raw_query.lower()
 
         # Check for specific query patterns (ordered by priority)
         # Using frozenset for O(1) lookup performance

@@ -32,6 +32,12 @@ DEFAULT_YEAR_SCORE = 0.5
 RATING_MIN_WEIGHT = 0.3
 RATING_CONFIDENCE_FACTOR = 0.7
 
+# Genre/keyword matching constants
+GENRE_MATCH_SCORE = 0.3  # Score per matching genre
+THEME_MATCH_SCORE = 0.1  # Score per matching theme/keyword
+DEFAULT_NO_GENRE_SCORE = 0.5  # Default score when no genres specified
+MAX_THEME_CONTRIBUTION = 0.5  # Maximum contribution from theme matches
+
 
 class SignalExtractor:
     """Base class for signal extractors."""
@@ -120,21 +126,21 @@ class GenreKeywordMatchExtractor(SignalExtractor):
         query_themes = {t.lower() for t in intent.themes}
 
         # Add genre constraints if present
-        if intent.constraints and intent.constraints.genres:
-            query_genres = {g.lower() for g in intent.constraints.genres}
+        if parsed_query.constraints and parsed_query.constraints.genres:
+            query_genres = {g.lower() for g in parsed_query.constraints.genres}
 
-        # Genre matching (0.3 per match, max 1.0)
+        # Genre matching
         if query_genres:
             genre_matches = len(movie_genres & query_genres)
-            score += min(1.0, genre_matches * 0.3)
+            score += min(1.0, genre_matches * GENRE_MATCH_SCORE)
         else:
             # If no genres specified, don't penalize
-            score += 0.5
+            score += DEFAULT_NO_GENRE_SCORE
 
-        # Theme/keyword matching (0.1 per match, max 0.5)
+        # Theme/keyword matching
         if query_themes:
             keyword_matches = len(movie_keywords & query_themes)
-            score += min(0.5, keyword_matches * 0.1)
+            score += min(MAX_THEME_CONTRIBUTION, keyword_matches * THEME_MATCH_SCORE)
 
         # Normalize to [0, 1]
         return min(1.0, score)
