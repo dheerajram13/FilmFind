@@ -6,6 +6,7 @@ from app.utils.json_utils import (
     validate_json_fields,
 )
 from app.utils.logger import get_logger, setup_logger
+from app.utils.math_utils import clamp, log_normalize, normalize_to_range, sigmoid
 from app.utils.rate_limiter import RateLimiter
 from app.utils.retry import retry_with_backoff
 
@@ -19,4 +20,8 @@ __all__ = [
     "extract_json_from_markdown",
     "safe_json_parse",
     "validate_json_fields",
+    "clamp",
+    "sigmoid",
+    "normalize_to_range",
+    "log_normalize",
 ]

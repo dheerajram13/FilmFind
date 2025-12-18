@@ -19,6 +19,7 @@ import math
 from typing import Any
 
 from app.schemas.query import ParsedQuery
+from app.utils.math_utils import clamp, sigmoid
 
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class SemanticSimilarityExtractor(SignalExtractor):
         _ = parsed_query, context  # Unused but part of interface
         # Similarity score already normalized from vector search
         similarity = movie.get("similarity_score", 0.0)
-        return max(0.0, min(1.0, similarity))
+        return clamp(similarity, 0.0, 1.0)
 
 
 class GenreKeywordMatchExtractor(SignalExtractor):
@@ -143,7 +144,7 @@ class GenreKeywordMatchExtractor(SignalExtractor):
             score += min(MAX_THEME_CONTRIBUTION, keyword_matches * THEME_MATCH_SCORE)
 
         # Normalize to [0, 1]
-        return min(1.0, score)
+        return clamp(score, 0.0, 1.0)
 
 
 class PopularityExtractor(SignalExtractor):
@@ -190,7 +191,7 @@ class PopularityExtractor(SignalExtractor):
 
         normalized = log_popularity / max_log
 
-        return min(1.0, normalized)
+        return clamp(normalized, 0.0, 1.0)
 
 
 class RatingQualityExtractor(SignalExtractor):
@@ -233,22 +234,14 @@ class RatingQualityExtractor(SignalExtractor):
         # Vote confidence: more votes = more confidence
         # Using sigmoid to map vote count to confidence weight
         # 100 votes = 0.5 weight, 500 votes = 0.88, 1000 votes = 0.95
-        vote_confidence = self._sigmoid(vote_count / 100.0)
+        vote_confidence = sigmoid(vote_count / 100.0)
 
         # Weighted score: rating weighted by vote confidence
         # Minimum weight ensures ratings with few votes still count
         weight = RATING_MIN_WEIGHT + (RATING_CONFIDENCE_FACTOR * vote_confidence)
         weighted_score = normalized_rating * weight
 
-        return min(1.0, weighted_score)
-
-    @staticmethod
-    def _sigmoid(x: float) -> float:
-        """Sigmoid function: 1 / (1 + e^-x)"""
-        try:
-            return 1.0 / (1.0 + math.exp(-x))
-        except OverflowError:
-            return 0.0 if x < 0 else 1.0
+        return clamp(weighted_score, 0.0, 1.0)
 
 
 class RecencyExtractor(SignalExtractor):
@@ -317,7 +310,7 @@ class RecencyExtractor(SignalExtractor):
         # Floor at MIN_RECENCY_SCORE for very old content
         score = max(MIN_RECENCY_SCORE, score)
 
-        return min(1.0, score)
+        return clamp(score, 0.0, 1.0)
 
 
 class SignalExtractorFactory:
