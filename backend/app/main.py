@@ -15,7 +15,7 @@ from app.api.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.api.routes import health
+from app.api.routes import health, search
 from app.core.config import settings
 from app.utils.logger import get_logger
 
@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: ARG001
+async def lifespan(app: FastAPI):  # noqa: ARG001, ANN201
     """
     Lifespan context manager for startup and shutdown events.
 
@@ -119,11 +119,8 @@ app.add_middleware(RequestLoggingMiddleware)
 # Health check routes (no prefix)
 app.include_router(health.router)
 
-# API routes (will be added in Module 3.2)
-# from app.api.routes import search, movies, filters
-# app.include_router(search.router, prefix=f"{settings.API_PREFIX}/search", tags=["search"])
-# app.include_router(movies.router, prefix=f"{settings.API_PREFIX}/movies", tags=["movies"])
-# app.include_router(filters.router, prefix=f"{settings.API_PREFIX}/filters", tags=["filters"])
+# Search and recommendation routes
+app.include_router(search.router)
 
 # =============================================================================
 # Application Entry Point
