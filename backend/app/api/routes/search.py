@@ -11,6 +11,13 @@ Provides endpoints for:
 
 from fastapi import APIRouter, Depends, status
 
+from app.api.cache_dependencies import (
+    get_filter_cache,
+    get_movie_cache,
+    get_search_cache,
+    get_similar_cache,
+    get_trending_cache,
+)
 from app.api.constants import (
     MIN_QUERY_LENGTH,
     RERANK_MULTIPLIER,
@@ -19,6 +26,13 @@ from app.api.constants import (
 )
 from app.api.dependencies import DatabaseSession, PaginationParams
 from app.api.exceptions import ValidationException
+from app.core.cache_strategies import (
+    FilterCacheStrategy,
+    MovieCacheStrategy,
+    SearchCacheStrategy,
+    SimilarMoviesCacheStrategy,
+    TrendingCacheStrategy,
+)
 from app.schemas.movie import MovieResponse
 from app.schemas.query import QueryConstraints, QueryIntent
 from app.schemas.search import SearchFilters, SearchRequest, SearchResponse
@@ -102,6 +116,7 @@ async def search_movies(
     reranker: LLMReRanker = Depends(get_reranker),
     filter_engine: FilterEngine = Depends(get_filter_engine),
     validator: ConstraintValidator = Depends(get_constraint_validator),
+    cache: SearchCacheStrategy = Depends(get_search_cache),
 ) -> SearchResponse:
     """
     Natural language movie search with full intelligence pipeline.
@@ -139,6 +154,13 @@ async def search_movies(
             msg,
             details={"query": request.query},
         )
+
+    # Check cache first
+    filters_dict = request.filters.dict(exclude_none=True) if request.filters else None
+    cached_result = cache.get(request.query, filters_dict, request.limit)
+    if cached_result:
+        logger.info("Returning cached search results")
+        return SearchResponse(**cached_result)
 
     # Step 1: Parse query to extract intent
     try:
@@ -226,18 +248,24 @@ async def search_movies(
     # Convert to response format
     results = movies_to_search_results(reranked_results)
 
-    return SearchResponse(
+    response = SearchResponse(
         query=request.query,
         results=results,
         total=len(filtered_candidates),
         query_interpretation=build_query_interpretation(query_intent, validated_constraints),
     )
 
+    # Cache the response
+    cache.set(request.query, response.dict(), filters_dict, request.limit)
+
+    return response
+
 
 @router.get("/movie/{movie_id}", status_code=status.HTTP_200_OK, response_model=MovieResponse)
 async def get_movie_details(
     movie_id: int,
     db: DatabaseSession,
+    cache: MovieCacheStrategy = Depends(get_movie_cache),
 ) -> MovieResponse:
     """
     Get detailed information about a specific movie.
@@ -245,6 +273,7 @@ async def get_movie_details(
     Args:
         movie_id: Database ID of the movie
         db: Database session
+        cache: Movie cache strategy
 
     Returns:
         Detailed movie information
@@ -252,8 +281,20 @@ async def get_movie_details(
     Raises:
         NotFoundException: If movie not found
     """
+    # Check cache first
+    cached_result = cache.get(movie_id)
+    if cached_result:
+        logger.info(f"Returning cached movie details for ID: {movie_id}")
+        return MovieResponse(**cached_result)
+
+    # Fetch from database
     movie = get_movie_by_id(db, movie_id)
-    return movie_to_response(movie)
+    response = movie_to_response(movie)
+
+    # Cache the response
+    cache.set(movie_id, response.dict())
+
+    return response
 
 
 @router.get("/movie/similar/{movie_id}", status_code=status.HTTP_200_OK)
@@ -262,6 +303,7 @@ async def get_similar_movies(
     db: DatabaseSession,
     pagination: PaginationParams,
     retrieval_engine: SemanticRetrievalEngine = Depends(get_retrieval_engine),
+    cache: SimilarMoviesCacheStrategy = Depends(get_similar_cache),
 ) -> dict:
     """
     Find movies similar to a specific movie.
@@ -280,6 +322,14 @@ async def get_similar_movies(
     Raises:
         NotFoundException: If reference movie not found
     """
+    # Check cache first
+    skip = pagination["skip"]
+    limit = pagination["limit"]
+    cached_result = cache.get(movie_id, skip, limit)
+    if cached_result:
+        logger.info(f"Returning cached similar movies for ID: {movie_id}")
+        return cached_result
+
     # Get reference movie
     reference_movie = get_movie_by_id(db, movie_id)
 
@@ -303,20 +353,27 @@ async def get_similar_movies(
     similar_movies = [m for m in similar_movies if m.id != movie_id]
 
     # Apply pagination
-    skip = pagination["skip"]
-    limit = pagination["limit"]
     similar_movies = similar_movies[skip : skip + limit]
 
     # Convert to response format
     results = movies_to_search_results(similar_movies)
 
-    return {
+    response = {
         "reference_movie": {
             "id": reference_movie.id,
             "title": reference_movie.title,
         },
-        "similar_movies": results,
+        "similar_movies": [r.dict() for r in results],
         "total": len(similar_movies),
+    }
+
+    # Cache the response
+    cache.set(movie_id, response, skip, limit)
+
+    return {
+        "reference_movie": response["reference_movie"],
+        "similar_movies": results,
+        "total": response["total"],
     }
 
 
@@ -327,6 +384,7 @@ async def filter_movies(
     pagination: PaginationParams,
     filter_engine: FilterEngine = Depends(get_filter_engine),
     validator: ConstraintValidator = Depends(get_constraint_validator),
+    cache: FilterCacheStrategy = Depends(get_filter_cache),
 ) -> dict:
     """
     Filter movies by constraints without semantic search.
@@ -347,6 +405,15 @@ async def filter_movies(
         ValidationException: If filters are invalid
     """
     logger.info(f"Filter request: {filters.dict(exclude_none=True)}")
+
+    # Check cache first
+    skip = pagination["skip"]
+    limit = pagination["limit"]
+    filters_dict = filters.dict(exclude_none=True)
+    cached_result = cache.get(filters_dict, skip, limit)
+    if cached_result:
+        logger.info("Returning cached filter results")
+        return cached_result
 
     # Convert SearchFilters to QueryConstraints
     constraints = _convert_filters_to_constraints(filters)
@@ -370,12 +437,20 @@ async def filter_movies(
     logger.info(f"Filtered to {len(filtered_movies)} movies")
 
     # Apply pagination
-    skip = pagination["skip"]
-    limit = pagination["limit"]
     paginated_movies = filtered_movies[skip : skip + limit]
 
     # Convert to response format
     results = movies_to_responses(paginated_movies)
+
+    # Serialize for cache
+    cached_response = {
+        "movies": [r.dict() for r in results],
+        "total": len(filtered_movies),
+        "filters_applied": validated_constraints.dict(exclude_none=True),
+    }
+
+    # Cache the serialized response
+    cache.set(filters_dict, cached_response, skip, limit)
 
     return {
         "movies": results,
@@ -388,6 +463,7 @@ async def filter_movies(
 async def get_trending_movies(
     db: DatabaseSession,
     pagination: PaginationParams,
+    cache: TrendingCacheStrategy = Depends(get_trending_cache),
 ) -> dict:
     """
     Get trending movies sorted by popularity.
@@ -395,15 +471,33 @@ async def get_trending_movies(
     Args:
         db: Database session
         pagination: Pagination parameters (skip, limit)
+        cache: Trending cache strategy
 
     Returns:
         List of trending movies
     """
+    # Check cache first
+    skip = pagination["skip"]
+    limit = pagination["limit"]
+    cached_result = cache.get(skip, limit)
+    if cached_result:
+        logger.info("Returning cached trending movies")
+        return cached_result
+
     # Get movies sorted by popularity
-    movies, total = fetch_trending_movies(db, skip=pagination["skip"], limit=pagination["limit"])
+    movies, total = fetch_trending_movies(db, skip=skip, limit=limit)
 
     # Convert to response format
     results = movies_to_responses(movies)
+
+    # Serialize for cache
+    cached_response = {
+        "movies": [r.dict() for r in results],
+        "total": total,
+    }
+
+    # Cache the serialized response
+    cache.set(cached_response, skip, limit)
 
     return {
         "movies": results,

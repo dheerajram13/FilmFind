@@ -1,6 +1,8 @@
 """
 Configuration management for FilmFind backend
 """
+from typing import ClassVar
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -26,7 +28,11 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False  # SQLAlchemy echo SQL queries
 
     # Redis Cache
-    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
+    REDIS_HOST: str = Field(default="localhost", description="Redis host")
+    REDIS_PORT: int = Field(default=6379, description="Redis port")
+    REDIS_DB: int = Field(default=0, description="Redis database number")
+    REDIS_PASSWORD: str | None = Field(default=None, description="Redis password (optional)")
+    CACHE_ENABLED: bool = Field(default=True, description="Enable/disable caching")
     CACHE_TTL: int = 3600  # 1 hour default TTL
 
     # TMDB API
@@ -79,7 +85,11 @@ class Settings(BaseSettings):
     WEIGHT_RECENCY: float = 0.1
 
     # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000", "https://filmfind.com"]
+    CORS_ORIGINS: ClassVar[list] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://filmfind.com",
+    ]
 
     # Security
     SECRET_KEY: str = Field(
