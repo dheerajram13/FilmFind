@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
+from app.core.cache_manager import get_cache_manager
 from app.core.config import settings
 from app.utils.logger import get_logger
 
@@ -131,5 +132,23 @@ async def ping():
     """
     return {
         "message": "pong",
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/cache/stats", status_code=status.HTTP_200_OK)
+async def get_cache_stats():
+    """
+    Get cache statistics (hits, misses, hit rate).
+
+    Returns:
+        Cache performance metrics
+    """
+    cache_manager = get_cache_manager()
+    stats = cache_manager.get_stats()
+
+    return {
+        "cache_enabled": settings.CACHE_ENABLED,
+        "stats": stats,
         "timestamp": datetime.now(UTC).isoformat(),
     }
