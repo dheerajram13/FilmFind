@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_db
 from app.core.cache_manager import get_cache_manager
 from app.core.config import settings
+from app.core.scheduler import get_scheduler
 from app.utils.logger import get_logger
 
 
@@ -151,4 +152,61 @@ async def get_cache_stats():
         "cache_enabled": settings.CACHE_ENABLED,
         "stats": stats,
         "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/jobs", status_code=status.HTTP_200_OK)
+async def get_scheduled_jobs():
+    """
+    Get list of scheduled background jobs.
+
+    Returns:
+        List of jobs with their next run times
+    """
+    if not settings.ENABLE_BACKGROUND_JOBS:
+        return {
+            "enabled": False,
+            "message": "Background jobs are disabled",
+            "jobs": [],
+        }
+
+    scheduler = get_scheduler()
+    jobs = scheduler.get_jobs()
+
+    return {
+        "enabled": True,
+        "jobs": jobs,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK)
+async def trigger_job(job_id: str):
+    """
+    Manually trigger a background job to run immediately.
+
+    Args:
+        job_id: ID of the job to trigger
+
+    Returns:
+        Success message or error
+    """
+    if not settings.ENABLE_BACKGROUND_JOBS:
+        return {
+            "success": False,
+            "message": "Background jobs are disabled",
+        }
+
+    scheduler = get_scheduler()
+    success = scheduler.run_job_now(job_id)
+
+    if success:
+        return {
+            "success": True,
+            "message": f"Job '{job_id}' triggered successfully",
+        }
+
+    return {
+        "success": False,
+        "message": f"Job '{job_id}' not found",
     }

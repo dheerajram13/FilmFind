@@ -17,6 +17,7 @@ from app.api.middleware import (
 )
 from app.api.routes import health, search
 from app.core.config import settings
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.utils.logger import get_logger
 
 
@@ -43,10 +44,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, ANN201
     logger.info(f"API Prefix: {settings.API_PREFIX}")
     logger.info(f"Docs URL: {settings.API_PREFIX}/docs")
 
-    # TODO: Initialize resources here
-    # - Load ML models
-    # - Connect to external services
-    # - Warm up caches
+    # Start background job scheduler
+    start_scheduler()
 
     logger.info("Application startup complete")
 
@@ -55,10 +54,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, ANN201
     # Shutdown
     logger.info("Shutting down application...")
 
-    # TODO: Cleanup resources here
-    # - Close database connections
-    # - Unload ML models
-    # - Flush caches
+    # Stop background job scheduler
+    stop_scheduler()
 
     logger.info("Application shutdown complete")
 
