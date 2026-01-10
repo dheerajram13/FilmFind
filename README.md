@@ -47,6 +47,7 @@ FilmFind goes beyond traditional movie recommendation systems by:
 "Movies about F1 racing with intense competition and personal rivalries"
 "Mystery and magical adventures like Harry Potter with school settings"
 "Lighthearted sitcoms like Friends about group of friends navigating life and relationships"
+"Shows like Dark"
 ```
 
 ---
