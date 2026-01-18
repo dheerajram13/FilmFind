@@ -2,7 +2,7 @@
 
 > **Discover movies that match your mood, not just your keywords.**
 
-FilmFind is a cutting-edge AI-powered movie and TV series recommendation system that understands natural language queries, interprets emotional intent, and delivers personalized recommendations using semantic search, hybrid embeddings, and LLM-powered re-ranking.
+FilmFind is an AI-powered movie and TV series recommendation system that understands natural language queries, interprets emotional intent, and delivers personalized recommendations using semantic search, hybrid embeddings, and LLM-powered re-ranking.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
