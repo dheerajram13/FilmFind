@@ -1,6 +1,6 @@
 # 🎬 FilmFind - AI-Powered Semantic Movie Discovery Engine
 
-> **Discover movies that match your mood, not just your keywords.**
+> **Discover movies that match your mood, not just your keyword.**
 
 FilmFind is an AI-powered movie and TV series recommendation system that understands natural language queries, interprets emotional intent, and delivers personalized recommendations using semantic search, hybrid embeddings, and LLM-powered re-ranking.
 
