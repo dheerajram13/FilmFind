@@ -5,29 +5,53 @@
  */
 
 /**
+ * Genre schema
+ */
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+/**
+ * Keyword schema
+ */
+export interface Keyword {
+  id: number;
+  name: string;
+}
+
+/**
+ * Cast member schema
+ */
+export interface CastMember {
+  id: number;
+  name: string;
+  character_name: string | null;
+  profile_path: string | null;
+}
+
+/**
  * Movie response schema
  */
 export interface Movie {
   id: number;
   tmdb_id: number;
   title: string;
+  original_title?: string | null;
   overview: string | null;
   release_date: string | null;
   poster_path: string | null;
   backdrop_path: string | null;
-  genres: string[];
+  genres: Genre[];
+  keywords?: Keyword[];
+  cast_members?: CastMember[];
   vote_average: number;
   vote_count: number;
   popularity: number;
   runtime: number | null;
   original_language: string;
-  adult: boolean;
   tagline: string | null;
-  status: string | null;
-  budget: number | null;
-  revenue: number | null;
-  homepage: string | null;
-  imdb_id: string | null;
+  streaming_providers?: Record<string, unknown> | null;
 }
 
 /**

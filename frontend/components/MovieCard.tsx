@@ -102,10 +102,10 @@ export function MovieCard({ movie, className, showScore = false }: MovieCardProp
           <div className="mt-2 flex flex-wrap gap-1">
             {movie.genres.slice(0, 3).map((genre) => (
               <span
-                key={genre}
+                key={genre.id}
                 className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
               >
-                {genre}
+                {genre.name}
               </span>
             ))}
           </div>
