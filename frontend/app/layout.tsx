@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { FilterProvider } from "@/lib/filter-context";
 
 export const metadata: Metadata = {
   title: "FilmFind - AI-Powered Movie Discovery",
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <FilterProvider>
+          {children}
+        </FilterProvider>
       </body>
     </html>
   );

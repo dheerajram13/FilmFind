@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Filter as FilterIcon } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { SearchResults } from "@/components/SearchResults";
+import { FilterPanel } from "@/components/FilterPanel";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useFilters } from "@/lib/filter-context";
 import apiClient, { APIError } from "@/lib/api-client";
 import { MovieSearchResult, SearchResponse } from "@/types/api";
 
@@ -12,10 +15,12 @@ export default function Home() {
   const [results, setResults] = useState<MovieSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  const { filters, hasActiveFilters } = useFilters();
   const debouncedQuery = useDebounce(query, 300);
 
-  const performSearch = useCallback(async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string, searchFilters: typeof filters) => {
     if (!searchQuery.trim()) {
       setResults([]);
       setError(null);
@@ -26,7 +31,19 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await apiClient.search(searchQuery, undefined, 20) as SearchResponse;
+      // Only send non-empty filter values
+      const cleanFilters = Object.fromEntries(
+        Object.entries(searchFilters).filter(([_, value]) => {
+          if (Array.isArray(value)) return value.length > 0;
+          return value !== undefined && value !== null;
+        })
+      );
+
+      const response = await apiClient.search(
+        searchQuery,
+        Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined,
+        20
+      ) as SearchResponse;
       setResults(response.results);
     } catch (err) {
       console.error("Search error:", err);
@@ -42,11 +59,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    performSearch(debouncedQuery);
-  }, [debouncedQuery, performSearch]);
+    performSearch(debouncedQuery, filters);
+  }, [debouncedQuery, filters, performSearch]);
 
   const handleRetry = () => {
-    performSearch(debouncedQuery);
+    performSearch(debouncedQuery, filters);
+  };
+
+  const handleApplyFilters = () => {
+    // Trigger search with current query and new filters
+    if (debouncedQuery.trim()) {
+      performSearch(debouncedQuery, filters);
+    }
   };
 
   return (
@@ -61,8 +85,18 @@ export default function Home() {
             <p className="text-center text-gray-600 dark:text-gray-400 max-w-2xl">
               Discover movies using natural language and AI-powered semantic search
             </p>
-            <div className="w-full max-w-3xl">
+            <div className="w-full max-w-3xl flex gap-3">
               <SearchBar onSearch={setQuery} autoFocus />
+              <button
+                onClick={() => setIsFilterOpen(true)}
+                className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 relative"
+              >
+                <FilterIcon size={18} />
+                <span className="hidden sm:inline">Filters</span>
+                {hasActiveFilters && (
+                  <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-950" />
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -79,6 +113,13 @@ export default function Home() {
           showScore
         />
       </main>
+
+      {/* Filter Panel */}
+      <FilterPanel
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        onApply={handleApplyFilters}
+      />
     </div>
   );
 }
