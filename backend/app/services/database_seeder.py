@@ -255,9 +255,10 @@ class DatabaseSeederService:
         Returns:
             "imported" or "skipped"
         """
-        tmdb_id = movie_data.get("id")
+        # Support both 'id' and 'tmdb_id' field names
+        tmdb_id = movie_data.get("id") or movie_data.get("tmdb_id")
         if not tmdb_id:
-            raise ValueError("Movie data missing 'id' field")
+            raise ValueError("Movie data missing 'id' or 'tmdb_id' field")
 
         # Check if movie already exists
         existing = self.movie_repo.find_by_tmdb_id(tmdb_id)
@@ -265,8 +266,8 @@ class DatabaseSeederService:
             logger.debug(f"Movie {tmdb_id} already exists, skipping")
             return "skipped"
 
-        # Create movie entity
-        movie = self._create_movie_from_data(movie_data)
+        # Create movie entity (pass tmdb_id separately)
+        movie = self._create_movie_from_data(movie_data, tmdb_id)
 
         # Add relationships
         if "genres" in movie_data:
@@ -289,23 +290,29 @@ class DatabaseSeederService:
     # Private Methods - Entity Creation
     # =============================================================================
 
-    def _create_movie_from_data(self, data: dict) -> Movie:
+    def _create_movie_from_data(self, data: dict, tmdb_id: int) -> Movie:
         """
         Create Movie entity from TMDB data.
 
         Args:
             data: TMDB movie dictionary
+            tmdb_id: TMDB ID of the movie
 
         Returns:
             Movie instance (not yet saved to DB)
         """
-        # Parse release date
+        # Parse release date - support both ISO format and datetime string
         release_date = None
         if data.get("release_date"):
             try:
+                # Try ISO format first (YYYY-MM-DD)
                 release_date = datetime.strptime(data["release_date"], "%Y-%m-%d")
             except ValueError:
-                logger.warning(f"Invalid release date format: {data['release_date']}")
+                try:
+                    # Try datetime format with time (YYYY-MM-DD HH:MM:SS)
+                    release_date = datetime.strptime(data["release_date"], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    logger.warning(f"Invalid release date format: {data['release_date']}")
 
         # Extract streaming providers (if available)
         streaming_providers = None
@@ -313,7 +320,7 @@ class DatabaseSeederService:
             streaming_providers = data["watch/providers"].get("results", {})
 
         return Movie(
-            tmdb_id=data["id"],
+            tmdb_id=tmdb_id,
             title=data.get("title", ""),
             original_title=data.get("original_title"),
             overview=data.get("overview"),

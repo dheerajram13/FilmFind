@@ -22,20 +22,23 @@ def build_query_interpretation(
         Dictionary with query interpretation details
     """
     interpretation = {
-        "semantic_query": query_intent.semantic_query,
-        "intent": query_intent.intent_type.value if query_intent.intent_type else None,
+        "raw_query": query_intent.raw_query,
         "filters_applied": validated_constraints.dict(exclude_none=True),
     }
 
     # Add optional fields if present
+    if query_intent.themes:
+        interpretation["themes"] = query_intent.themes
     if query_intent.reference_titles:
         interpretation["reference_titles"] = query_intent.reference_titles
-    if query_intent.genres:
-        interpretation["genres"] = query_intent.genres
+    if query_intent.keywords:
+        interpretation["keywords"] = query_intent.keywords
+    if query_intent.plot_elements:
+        interpretation["plot_elements"] = query_intent.plot_elements
     if query_intent.tones:
-        interpretation["tones"] = [t.value for t in query_intent.tones]
+        interpretation["tones"] = [str(t) for t in query_intent.tones]
     if query_intent.emotions:
-        interpretation["emotions"] = [e.value for e in query_intent.emotions]
+        interpretation["emotions"] = [str(e) for e in query_intent.emotions]
 
     return interpretation
 
@@ -55,7 +58,6 @@ def build_empty_query_interpretation(
         Dictionary with minimal query interpretation details
     """
     return {
-        "semantic_query": query_intent.semantic_query,
-        "intent": query_intent.intent_type.value if query_intent.intent_type else None,
+        "raw_query": query_intent.raw_query,
         "filters_applied": validated_constraints.dict(exclude_none=True),
     }

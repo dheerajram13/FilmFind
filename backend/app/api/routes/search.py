@@ -34,7 +34,7 @@ from app.core.cache_strategies import (
     TrendingCacheStrategy,
 )
 from app.schemas.movie import MovieResponse
-from app.schemas.query import QueryConstraints, QueryIntent
+from app.schemas.query import ParsedQuery, QueryConstraints, QueryIntent
 from app.schemas.search import SearchFilters, SearchRequest, SearchResponse
 from app.services.constraint_validator import ConstraintValidator
 from app.services.filter_engine import FilterEngine
@@ -78,7 +78,8 @@ def get_query_parser() -> QueryParser:
 
 def get_retrieval_engine(db: DatabaseSession) -> SemanticRetrievalEngine:
     """Dependency for semantic retrieval engine."""
-    return SemanticRetrievalEngine(db)
+    from app.repositories.movie_repository import MovieRepository
+    return SemanticRetrievalEngine(movie_repo=MovieRepository(db))
 
 
 def get_scoring_engine() -> MultiSignalScoringEngine:
@@ -190,9 +191,12 @@ async def search_movies(
 
     # Step 3: Retrieve candidates using semantic search
     try:
+        # Create retrieval config with top_k
+        from app.services.retrieval_engine import RetrievalConfig
+        retrieval_config = RetrievalConfig(top_k=request.limit * RETRIEVAL_MULTIPLIER)
         candidates = retrieval_engine.retrieve(
-            query=query_intent.semantic_query or request.query,
-            top_k=request.limit * RETRIEVAL_MULTIPLIER,
+            parsed_query=query_intent,
+            config=retrieval_config,
         )
         logger.info(f"Retrieved {len(candidates)} candidates")
     except Exception as exc:
@@ -211,17 +215,17 @@ async def search_movies(
         return SearchResponse(
             query=request.query,
             results=[],
-            total=0,
+            count=0,
             query_interpretation=build_empty_query_interpretation(
-                query_intent, validated_constraints
+                query_intent.intent, validated_constraints
             ),
         )
 
     # Step 5: Score candidates using multi-signal ranking
     try:
-        scored_candidates = scoring_engine.score_batch(
+        scored_candidates = scoring_engine.score_candidates(
             candidates=filtered_candidates,
-            query_intent=query_intent,
+            parsed_query=query_intent,
         )
         logger.info(f"Scored {len(scored_candidates)} candidates")
     except Exception as exc:
@@ -251,8 +255,8 @@ async def search_movies(
     response = SearchResponse(
         query=request.query,
         results=results,
-        total=len(filtered_candidates),
-        query_interpretation=build_query_interpretation(query_intent, validated_constraints),
+        count=len(filtered_candidates),
+        query_interpretation=build_query_interpretation(query_intent.intent, validated_constraints),
     )
 
     # Cache the response
@@ -343,10 +347,19 @@ async def get_similar_movies(
             details={"movie_id": movie_id},
         )
 
+    # Create a minimal ParsedQuery for the retrieval engine
+    from app.services.retrieval_engine import RetrievalConfig
+    simple_query = ParsedQuery(
+        intent=QueryIntent(raw_query=reference_movie.overview),
+        constraints=QueryConstraints(),
+        search_text=reference_movie.overview,
+    )
+    retrieval_config = RetrievalConfig(top_k=pagination["limit"] + SIMILAR_MOVIES_BUFFER)
+
     # Retrieve similar movies (add buffer because reference movie will be in results)
     similar_movies = retrieval_engine.retrieve(
-        query=reference_movie.overview,
-        top_k=pagination["limit"] + SIMILAR_MOVIES_BUFFER,
+        parsed_query=simple_query,
+        config=retrieval_config,
     )
 
     # Filter out the reference movie itself
@@ -521,67 +534,55 @@ def _convert_filters_to_constraints(filters: SearchFilters) -> QueryConstraints:
         QueryConstraints schema
     """
     return QueryConstraints(
-        min_year=filters.min_year,
-        max_year=filters.max_year,
-        min_rating=filters.min_rating,
-        max_rating=filters.max_rating,
-        min_runtime=filters.min_runtime,
-        max_runtime=filters.max_runtime,
-        genres=filters.genres,
-        excluded_genres=filters.excluded_genres,
-        languages=filters.languages,
-        exclude_adult=filters.exclude_adult,
-        streaming_providers=filters.streaming_providers,
-        min_popularity=filters.min_popularity,
-        max_popularity=filters.max_popularity,
+        year_min=filters.year_min,
+        year_max=filters.year_max,
+        rating_min=filters.rating_min,
+        runtime_min=filters.runtime_min,
+        runtime_max=filters.runtime_max,
+        genres=filters.genres or [],
+        languages=[filters.language] if filters.language else [],
+        adult_content=not filters.exclude_adult,
+        streaming_providers=filters.streaming_providers or [],
     )
 
 
-def _merge_constraints(query_intent: QueryIntent, filters: SearchFilters | None) -> QueryIntent:
+def _merge_constraints(parsed_query: ParsedQuery, filters: SearchFilters | None) -> QueryConstraints:
     """
     Merge query-parsed constraints with explicit filter constraints.
 
     Explicit filters take precedence over parsed constraints.
 
     Args:
-        query_intent: Parsed query intent with constraints
+        parsed_query: Parsed query with intent and constraints
         filters: Explicit filter constraints from request
 
     Returns:
-        Merged query intent with combined constraints
+        Merged constraints
     """
-    if not filters:
-        return query_intent
+    # Start with parsed constraints
+    merged_constraints = parsed_query.constraints.copy(deep=True)
 
-    # Create merged constraints
-    merged_intent = query_intent.copy(deep=True)
+    if not filters:
+        return merged_constraints
 
     # Override with explicit filters
-    if filters.min_year is not None:
-        merged_intent.constraints.min_year = filters.min_year
-    if filters.max_year is not None:
-        merged_intent.constraints.max_year = filters.max_year
-    if filters.min_rating is not None:
-        merged_intent.constraints.min_rating = filters.min_rating
-    if filters.max_rating is not None:
-        merged_intent.constraints.max_rating = filters.max_rating
-    if filters.min_runtime is not None:
-        merged_intent.constraints.min_runtime = filters.min_runtime
-    if filters.max_runtime is not None:
-        merged_intent.constraints.max_runtime = filters.max_runtime
+    if filters.year_min is not None:
+        merged_constraints.year_min = filters.year_min
+    if filters.year_max is not None:
+        merged_constraints.year_max = filters.year_max
+    if filters.rating_min is not None:
+        merged_constraints.rating_min = filters.rating_min
+    if filters.runtime_min is not None:
+        merged_constraints.runtime_min = filters.runtime_min
+    if filters.runtime_max is not None:
+        merged_constraints.runtime_max = filters.runtime_max
     if filters.genres:
-        merged_intent.constraints.genres = filters.genres
-    if filters.excluded_genres:
-        merged_intent.constraints.excluded_genres = filters.excluded_genres
-    if filters.languages:
-        merged_intent.constraints.languages = filters.languages
+        merged_constraints.genres = filters.genres
+    if filters.language:
+        merged_constraints.languages = [filters.language]
     if filters.exclude_adult is not None:
-        merged_intent.constraints.exclude_adult = filters.exclude_adult
+        merged_constraints.adult_content = not filters.exclude_adult
     if filters.streaming_providers:
-        merged_intent.constraints.streaming_providers = filters.streaming_providers
-    if filters.min_popularity is not None:
-        merged_intent.constraints.min_popularity = filters.min_popularity
-    if filters.max_popularity is not None:
-        merged_intent.constraints.max_popularity = filters.max_popularity
+        merged_constraints.streaming_providers = filters.streaming_providers
 
-    return merged_intent
+    return merged_constraints

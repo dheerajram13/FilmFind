@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # Groq API (Free Tier)
     GROQ_API_KEY: str = Field(default="", description="Groq API key for LLM inference")
-    GROQ_MODEL: str = "llama-3.1-70b-versatile"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_MAX_TOKENS: int = 1024
     GROQ_TEMPERATURE: float = 0.7
 

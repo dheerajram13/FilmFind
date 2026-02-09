@@ -14,6 +14,7 @@ pydantic-settings==2.1.0
 
 # AI/ML - 100% FREE
 sentence-transformers==2.2.2
+huggingface-hub==0.19.4
 faiss-cpu==1.7.4
 numpy==1.24.3
 scipy==1.11.4

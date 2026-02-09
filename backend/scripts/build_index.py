@@ -40,10 +40,8 @@ import numpy as np
 from sqlalchemy import func
 
 from app.core.database import SessionLocal
-from app.models.movie import Embedding
-from app.services.embedding_service import get_embedding_service
+from app.models.movie import Movie
 from app.services.vector_search import VectorSearchService
-from app.utils.vector_utils import VectorNormalizer
 
 
 # Setup logging
@@ -68,9 +66,11 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
 
     db = SessionLocal()
     try:
-        # Get total count
-        total_count = db.query(func.count(Embedding.id)).scalar()
-        logger.info(f"Found {total_count} embeddings in database")
+        # Get total count of movies with embeddings
+        total_count = db.query(func.count(Movie.id)).filter(
+            Movie.embedding_vector.isnot(None)
+        ).scalar()
+        logger.info(f"Found {total_count} movies with embeddings in database")
 
         if total_count == 0:
             msg = (
@@ -79,10 +79,10 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
             )
             raise ValueError(msg)
 
-        # Get embedding dimension from the first row
-        query = db.query(Embedding.movie_id, Embedding.embedding_vector).order_by(
-            Embedding.movie_id
-        )
+        # Get embedding dimension from the first movie
+        query = db.query(Movie.id, Movie.embedding_vector).filter(
+            Movie.embedding_vector.isnot(None)
+        ).order_by(Movie.id)
         first_row = query.first()
         if first_row is None:
             msg = "No embeddings found in database."

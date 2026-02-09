@@ -24,6 +24,13 @@ from app.utils.string_utils import normalize_string
 logger = get_logger(__name__)
 
 
+def _get_attr(obj: Movie | dict, attr: str, default=None):
+    """Get attribute from Movie object or dict."""
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    return getattr(obj, attr, default)
+
+
 class FilterEngine:
     """
     Applies hard constraints to movie candidates.
@@ -43,13 +50,13 @@ class FilterEngine:
     """
 
     def apply_filters(
-        self, candidates: Sequence[Movie], constraints: QueryConstraints
-    ) -> list[Movie]:
+        self, candidates: Sequence[Movie | dict], constraints: QueryConstraints
+    ) -> list[Movie | dict]:
         """
         Apply all constraints to filter movie candidates.
 
         Args:
-            candidates: List of movie candidates to filter
+            candidates: List of movie candidates to filter (Movie objects or dicts)
             constraints: Constraints to apply
 
         Returns:
@@ -102,20 +109,20 @@ class FilterEngine:
         return filtered
 
     def _filter_adult_content(
-        self, movies: list[Movie], constraints: QueryConstraints
-    ) -> list[Movie]:
+        self, movies: list[Movie | dict], constraints: QueryConstraints
+    ) -> list[Movie | dict]:
         """Filter based on adult content preference."""
         if constraints.adult_content:
             # No filtering needed if adult content is allowed
             return movies
 
         # Exclude adult content
-        filtered = [m for m in movies if not m.adult]
+        filtered = [m for m in movies if not _get_attr(m, 'adult', False)]
         if len(filtered) < len(movies):
             logger.debug(f"Adult content filter: {len(movies)} → {len(filtered)}")
         return filtered
 
-    def _filter_language(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_language(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on language constraints."""
         if not constraints.languages:
             return movies
@@ -126,7 +133,7 @@ class FilterEngine:
         filtered = [
             m
             for m in movies
-            if m.original_language and normalize_string(m.original_language) in allowed_languages
+            if _get_attr(m, 'original_language') and normalize_string(_get_attr(m, 'original_language')) in allowed_languages
         ]
 
         if len(filtered) < len(movies):
@@ -136,7 +143,7 @@ class FilterEngine:
             )
         return filtered
 
-    def _filter_year_range(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_year_range(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on release year range."""
         year_min = constraints.year_min
         year_max = constraints.year_max
@@ -149,11 +156,18 @@ class FilterEngine:
 
         filtered = []
         for movie in movies:
-            # Skip movies without release date
-            if not movie.release_date:
+            # Skip movies without release date or year
+            release_date = _get_attr(movie, 'release_date')
+            year = _get_attr(movie, 'year')
+
+            if not year and not release_date:
                 continue
 
-            year = movie.release_date.year
+            if not year and release_date:
+                year = release_date.year if hasattr(release_date, 'year') else None
+
+            if not year:
+                continue
 
             # Apply year constraints
             if year_min and year < year_min:
@@ -169,7 +183,7 @@ class FilterEngine:
 
         return filtered
 
-    def _filter_rating(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_rating(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on minimum rating."""
         if constraints.rating_min is None:
             return movies
@@ -177,7 +191,7 @@ class FilterEngine:
         min_rating = constraints.rating_min
 
         filtered = [
-            m for m in movies if m.vote_average is not None and m.vote_average >= min_rating
+            m for m in movies if _get_attr(m, 'vote_average') is not None and _get_attr(m, 'vote_average') >= min_rating
         ]
 
         if len(filtered) < len(movies):
@@ -185,7 +199,7 @@ class FilterEngine:
 
         return filtered
 
-    def _filter_runtime(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_runtime(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on runtime constraints."""
         runtime_min = constraints.runtime_min
         runtime_max = constraints.runtime_max
@@ -196,13 +210,14 @@ class FilterEngine:
         filtered = []
         for movie in movies:
             # Skip movies without runtime
-            if not movie.runtime:
+            runtime = _get_attr(movie, 'runtime')
+            if not runtime:
                 continue
 
             # Apply runtime constraints
-            if runtime_min and movie.runtime < runtime_min:
+            if runtime_min and runtime < runtime_min:
                 continue
-            if runtime_max and movie.runtime > runtime_max:
+            if runtime_max and runtime > runtime_max:
                 continue
 
             filtered.append(movie)
@@ -213,7 +228,7 @@ class FilterEngine:
 
         return filtered
 
-    def _filter_genres(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_genres(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on genre requirements and exclusions."""
         required_genres = constraints.genres
         excluded_genres = constraints.exclude_genres
@@ -224,7 +239,21 @@ class FilterEngine:
         filtered = []
         for movie in movies:
             # Get movie genre names (case-insensitive)
-            movie_genres = {normalize_string(g.name) for g in movie.genres}
+            genres = _get_attr(movie, 'genres', [])
+            if isinstance(genres, list) and len(genres) > 0:
+                # Handle both objects and dicts/strings
+                if isinstance(genres[0], str):
+                    movie_genres = {normalize_string(g) for g in genres}
+                else:
+                    movie_genres = {normalize_string(g.name if hasattr(g, 'name') else g) for g in genres}
+            else:
+                movie_genres = set()
+
+            # If movie has no genres, skip genre filtering (include the movie)
+            # This allows semantic search to work even without genre metadata
+            if not movie_genres:
+                filtered.append(movie)
+                continue
 
             # Check required genres (must have ALL)
             if required_genres:
@@ -253,8 +282,8 @@ class FilterEngine:
         return filtered
 
     def _filter_streaming_providers(
-        self, movies: list[Movie], constraints: QueryConstraints
-    ) -> list[Movie]:
+        self, movies: list[Movie | dict], constraints: QueryConstraints
+    ) -> list[Movie | dict]:
         """Filter based on streaming provider availability."""
         if not constraints.streaming_providers:
             return movies
@@ -265,12 +294,13 @@ class FilterEngine:
         filtered = []
         for movie in movies:
             # Skip movies without streaming data
-            if not movie.streaming_providers:
+            streaming_providers = _get_attr(movie, 'streaming_providers')
+            if not streaming_providers:
                 continue
 
             # Check if movie is available on any of the desired providers
             # streaming_providers format: {"Netflix": ["US", "GB"], "Prime": ["US"]}
-            available_providers = {normalize_string(p) for p in movie.streaming_providers}
+            available_providers = {normalize_string(p) for p in streaming_providers}
 
             if available_providers.intersection(desired_providers):
                 filtered.append(movie)
@@ -283,7 +313,7 @@ class FilterEngine:
 
         return filtered
 
-    def _filter_popularity(self, movies: list[Movie], constraints: QueryConstraints) -> list[Movie]:
+    def _filter_popularity(self, movies: list[Movie | dict], constraints: QueryConstraints) -> list[Movie | dict]:
         """Filter based on popularity preferences."""
         # If both are False or both are True, no filtering needed
         if constraints.popular_only == constraints.hidden_gems:
@@ -293,7 +323,7 @@ class FilterEngine:
             return movies
 
         # Calculate median popularity for threshold
-        popularities = [m.popularity for m in movies if m.popularity is not None]
+        popularities = [_get_attr(m, 'popularity') for m in movies if _get_attr(m, 'popularity') is not None]
         if not popularities:
             return movies
 
@@ -302,7 +332,7 @@ class FilterEngine:
         if constraints.popular_only:
             # Keep only movies above median popularity
             filtered = [
-                m for m in movies if m.popularity is not None and m.popularity >= median_popularity
+                m for m in movies if _get_attr(m, 'popularity') is not None and _get_attr(m, 'popularity') >= median_popularity
             ]
             logger.debug(
                 f"Popular only filter (≥{median_popularity:.1f}): "
@@ -311,7 +341,7 @@ class FilterEngine:
         else:  # hidden_gems
             # Keep only movies below median popularity
             filtered = [
-                m for m in movies if m.popularity is not None and m.popularity < median_popularity
+                m for m in movies if _get_attr(m, 'popularity') is not None and _get_attr(m, 'popularity') < median_popularity
             ]
             logger.debug(
                 f"Hidden gems filter (<{median_popularity:.1f}): "

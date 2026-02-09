@@ -163,7 +163,7 @@ class SemanticRetrievalEngine:
                     "tmdb_id": 157336,
                     "title": "Interstellar",
                     "similarity_score": 0.89,
-                    "plot_summary": "...",
+                    "overview": "...",
                     "genres": ["Sci-Fi", "Drama"],
                     "rating": 8.4,
                     "popularity": 142.5,
@@ -178,7 +178,7 @@ class SemanticRetrievalEngine:
 
         try:
             logger.info(
-                f"Starting retrieval for query: '{parsed_query.raw_query}' "
+                f"Starting retrieval for query: '{parsed_query.intent.raw_query}' "
                 f"(top_k={config.top_k})"
             )
 
@@ -205,7 +205,7 @@ class SemanticRetrievalEngine:
             if config.apply_filters:
                 filtered_candidates = self._apply_filters(
                     candidates=enriched_candidates,
-                    constraints=parsed_query.intent.constraints,
+                    constraints=parsed_query.constraints,
                     include_adult=config.include_adult,
                 )
             else:
@@ -250,7 +250,7 @@ class SemanticRetrievalEngine:
         try:
             # Perform vector search
             results = self.vector_search.search(
-                query_vector=query_embedding,
+                query_embedding=query_embedding,
                 k=top_k,
             )
 
@@ -302,7 +302,7 @@ class SemanticRetrievalEngine:
                     "tmdb_id": movie.tmdb_id,
                     "title": movie.title,
                     "original_title": movie.original_title,
-                    "plot_summary": movie.plot_summary,
+                    "overview": movie.overview,
                     "tagline": movie.tagline,
                     "release_date": movie.release_date.isoformat()
                     if movie.release_date

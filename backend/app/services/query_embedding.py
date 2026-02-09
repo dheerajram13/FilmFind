@@ -137,8 +137,8 @@ class QueryEmbeddingService:
         parts = []
 
         # 1. Start with original query (primary signal)
-        if parsed_query.raw_query:
-            parts.append(parsed_query.raw_query)
+        if parsed_query.intent.raw_query:
+            parts.append(parsed_query.intent.raw_query)
 
         intent = parsed_query.intent
 
@@ -155,19 +155,19 @@ class QueryEmbeddingService:
 
         # 4. Add tones (mood/atmosphere)
         if intent.tones:
-            # Convert ToneType enums to strings
-            tones_text = ", ".join([tone.value for tone in intent.tones])
+            # Tones are already strings due to use_enum_values=True
+            tones_text = ", ".join([str(tone) for tone in intent.tones])
             parts.append(f"Tone: {tones_text}")
 
         # 5. Add emotions (emotional dimensions)
         if intent.emotions:
-            # Convert EmotionType enums to strings
-            emotions_text = ", ".join([emotion.value for emotion in intent.emotions])
+            # Emotions are already strings due to use_enum_values=True
+            emotions_text = ", ".join([str(emotion) for emotion in intent.emotions])
             parts.append(f"Emotions: {emotions_text}")
 
         # 6. Add genres (if specified)
-        if intent.constraints and intent.constraints.genres:
-            genres_text = ", ".join(intent.constraints.genres)
+        if parsed_query.constraints and parsed_query.constraints.genres:
+            genres_text = ", ".join(parsed_query.constraints.genres)
             parts.append(f"Genres: {genres_text}")
 
         # 7. Add undesired elements as negative context

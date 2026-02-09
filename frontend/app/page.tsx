@@ -5,7 +5,12 @@ import { Filter as FilterIcon } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { SearchResults } from "@/components/SearchResults";
 import { FilterPanel } from "@/components/FilterPanel";
+import { HeroBanner } from "@/components/HeroBanner";
+import { MovieCarousel } from "@/components/MovieCarousel";
+import { CarouselSkeleton } from "@/components/CarouselSkeleton";
+import { DiscoverySection } from "@/components/DiscoverySection";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useTrending } from "@/hooks/useTrending";
 import { useFilters } from "@/lib/filter-context";
 import apiClient, { APIError } from "@/lib/api-client";
 import { MovieSearchResult, SearchResponse } from "@/types/api";
@@ -19,6 +24,9 @@ export default function Home() {
 
   const { filters, hasActiveFilters } = useFilters();
   const debouncedQuery = useDebounce(query, 300);
+
+  // Fetch trending movies for homepage
+  const { movies: trendingMovies, isLoading: isTrendingLoading } = useTrending(20);
 
   const performSearch = useCallback(async (searchQuery: string, searchFilters: typeof filters) => {
     if (!searchQuery.trim()) {
@@ -73,6 +81,12 @@ export default function Home() {
     }
   };
 
+  const handleSearchSuggestion = (suggestion: string) => {
+    setQuery(suggestion);
+  };
+
+  const hasSearchQuery = debouncedQuery.trim().length > 0;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -86,7 +100,7 @@ export default function Home() {
               Discover movies using natural language and AI-powered semantic search
             </p>
             <div className="w-full max-w-3xl flex gap-3">
-              <SearchBar onSearch={setQuery} autoFocus />
+              <SearchBar onSearch={setQuery} autoFocus={false} />
               <button
                 onClick={() => setIsFilterOpen(true)}
                 className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 relative"
@@ -103,16 +117,50 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <SearchResults
-          results={results}
-          isLoading={isLoading}
-          error={error}
-          query={debouncedQuery}
-          onRetry={handleRetry}
-          showScore
-        />
-      </main>
+      {hasSearchQuery ? (
+        // Search Results
+        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <SearchResults
+            results={results}
+            isLoading={isLoading}
+            error={error}
+            query={debouncedQuery}
+            onRetry={handleRetry}
+            showScore
+          />
+        </main>
+      ) : (
+        // Homepage Discovery
+        <main>
+          {/* Hero Banner */}
+          {!isTrendingLoading && trendingMovies.length > 0 && (
+            <HeroBanner movie={trendingMovies[0]} />
+          )}
+
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-12">
+            {/* Trending Movies */}
+            {isTrendingLoading ? (
+              <CarouselSkeleton title="Trending Now" />
+            ) : trendingMovies.length > 0 ? (
+              <MovieCarousel
+                title="Trending Now"
+                movies={trendingMovies}
+              />
+            ) : null}
+
+            {/* Discovery Section */}
+            <DiscoverySection onSearchSuggestion={handleSearchSuggestion} />
+
+            {/* Popular Movies (subset of trending) */}
+            {!isTrendingLoading && trendingMovies.length > 10 && (
+              <MovieCarousel
+                title="Popular Movies"
+                movies={trendingMovies.slice(0, 10)}
+              />
+            )}
+          </div>
+        </main>
+      )}
 
       {/* Filter Panel */}
       <FilterPanel
