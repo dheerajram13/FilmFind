@@ -23,7 +23,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
-from app.models.movie import Movie, Genre, Keyword, Cast
+from app.models.media import Movie, Genre, Keyword, Cast
 from app.services.TMDB.tmdb_service import TMDBService
 
 

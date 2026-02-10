@@ -52,7 +52,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.database import engine
-from app.models.movie import Base
+from app.models.media import Base
 from app.services.database_seeder import DatabaseSeederService
 from app.utils.logger import get_logger
 

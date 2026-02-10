@@ -113,13 +113,15 @@ def check_database_tables(db: Optional[Session] = None) -> dict[str, Any]:
     """
 
     required_tables = {
+        "media",
         "movies",
+        "tv_shows",
         "genres",
         "keywords",
         "cast",
-        "movie_genres",
-        "movie_keywords",
-        "movie_cast",
+        "media_genres",
+        "media_keywords",
+        "media_cast",
     }
 
     session = db or SessionLocal()

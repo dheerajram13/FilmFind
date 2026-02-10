@@ -327,11 +327,10 @@ class SemanticRetrievalEngine:
                     # Cast (from relationship) - top 5
                     "cast": [
                         {
-                            "name": mc.cast_member.name,
-                            "character": mc.character_name,
-                            "order": mc.order_position,
+                            "name": cast.name,
+                            "profile_path": cast.profile_path,
                         }
-                        for mc in (movie.cast_members[:5] if movie.cast_members else [])
+                        for cast in (movie.cast_members[:5] if movie.cast_members else [])
                     ],
                 }
                 enriched.append(movie_dict)
