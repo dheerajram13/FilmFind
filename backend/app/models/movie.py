@@ -104,7 +104,10 @@ class Movie(Base):
 
     # Primary & Foreign Keys
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    tmdb_id = Column(Integer, unique=True, index=True, nullable=False)
+    tmdb_id = Column(Integer, index=True, nullable=False)  # Unique constraint is composite with media_type
+
+    # Media Type
+    media_type = Column(String(10), default="movie", index=True, nullable=False)  # 'movie' or 'tv'
 
     # Core Movie Information
     title = Column(String(500), nullable=False, index=True)
@@ -171,6 +174,8 @@ class Movie(Base):
         Index("idx_movies_updated_at", "updated_at"),
         # Adult content filter + popularity
         Index("idx_movies_adult_popularity", "adult", "popularity"),
+        # Media type + popularity (for filtering movies vs TV)
+        Index("idx_movies_media_type_popularity", "media_type", "popularity"),
     )
 
     # =============================================================================

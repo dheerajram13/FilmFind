@@ -58,6 +58,7 @@ class MovieResponse(MovieBase):
 
     id: int
     tmdb_id: int
+    media_type: str = Field(default="movie", description="Media type: 'movie' or 'tv'")
     popularity: Optional[float] = None
     vote_average: Optional[float] = None
     vote_count: Optional[int] = None

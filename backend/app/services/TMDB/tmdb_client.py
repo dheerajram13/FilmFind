@@ -113,6 +113,58 @@ class TMDBAPIClient:
 
         return self._make_request("/genre/movie/list")
 
+    # =============================================================================
+    # TV Show Methods
+    # =============================================================================
+
+    def get_tv_show(self, tv_id: int) -> Optional[dict[str, Any]]:
+        """Get TV show details by ID"""
+
+        return self._make_request(
+            f"/tv/{tv_id}", params={"append_to_response": "keywords,credits"}
+        )
+
+    def get_popular_tv_shows(self, page: int = 1) -> Optional[dict[str, Any]]:
+        """Get popular TV shows"""
+
+        return self._make_request("/tv/popular", params={"page": page})
+
+    def get_top_rated_tv_shows(self, page: int = 1) -> Optional[dict[str, Any]]:
+        """Get top rated TV shows"""
+
+        return self._make_request("/tv/top_rated", params={"page": page})
+
+    def get_tv_genres(self) -> Optional[dict[str, Any]]:
+        """Get list of all TV genres"""
+
+        return self._make_request("/genre/tv/list")
+
+    def discover_tv_shows(
+        self, page: int = 1, sort_by: str = "popularity.desc", **kwargs
+    ) -> Optional[dict[str, Any]]:
+        """
+        Discover TV shows with filters
+
+        Args:
+            page: Page number
+            sort_by: Sort order
+            **kwargs: Additional filter parameters (year, genre_id, etc.)
+        """
+
+        params = {"page": page, "sort_by": sort_by, **kwargs}
+
+        return self._make_request("/discover/tv", params=params)
+
+    def get_tv_keywords(self, tv_id: int) -> Optional[dict[str, Any]]:
+        """Get keywords for a TV show"""
+
+        return self._make_request(f"/tv/{tv_id}/keywords")
+
+    def get_tv_credits(self, tv_id: int) -> Optional[dict[str, Any]]:
+        """Get credits (cast/crew) for a TV show"""
+
+        return self._make_request(f"/tv/{tv_id}/credits")
+
     def close(self):
         """Close HTTP client"""
         self.http_client.close()

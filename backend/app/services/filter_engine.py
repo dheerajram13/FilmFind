@@ -14,7 +14,7 @@ Design Patterns:
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from app.models.movie import Movie
+from app.models.media import Movie
 from app.schemas.query import QueryConstraints
 from app.utils.logger import get_logger
 from app.utils.stats_utils import calculate_median

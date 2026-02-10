@@ -3,25 +3,25 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef, useState } from "react";
 import { Movie, MovieSearchResult } from "@/types/api";
-import { MovieCard } from "./MovieCard";
+import { MovieCard } from "@/components/movie/MovieCard";
 import { cn } from "@/lib/utils";
 
 interface MovieCarouselProps {
-  title: string;
+  title?: string;
   movies: (Movie | MovieSearchResult)[];
   showScore?: boolean;
   className?: string;
 }
 
 /**
- * MovieCarousel component for horizontal scrolling movie lists
+ * Netflix-style MovieCarousel for horizontal scrolling
  *
  * Features:
- * - Horizontal scroll with smooth animations
- * - Navigation arrows (left/right)
- * - Hide arrows when at start/end
- * - Responsive: snap scrolling on mobile, smooth scroll on desktop
- * - Reuses MovieCard component
+ * - Dark theme with Netflix-style navigation
+ * - Large, prominent arrows visible on hover
+ * - Smooth scrolling with fade edges
+ * - Larger cards for better visibility
+ * - Optimized spacing and layout
  */
 export function MovieCarousel({
   title,
@@ -37,7 +37,7 @@ export function MovieCarousel({
     if (!scrollContainerRef.current) return;
 
     const container = scrollContainerRef.current;
-    const scrollAmount = container.clientWidth * 0.8; // Scroll 80% of container width
+    const scrollAmount = container.clientWidth * 0.85; // Scroll most of the visible width
 
     const newScrollLeft =
       direction === "left"
@@ -68,31 +68,45 @@ export function MovieCarousel({
   return (
     <div className={cn("relative", className)}>
       {/* Title */}
-      <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
-        {title}
-      </h2>
+      {title && (
+        <h2 className="mb-6 text-xl font-semibold text-white sm:text-2xl">
+          {title}
+        </h2>
+      )}
 
       {/* Carousel Container */}
-      <div className="relative group">
-        {/* Left Arrow */}
+      <div className="group relative">
+        {/* Left Arrow - Netflix style */}
         {showLeftArrow && (
           <button
             onClick={() => scroll("left")}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
+            className={cn(
+              "absolute left-0 top-0 z-20 flex h-full w-12 items-center justify-center",
+              "bg-black/50 backdrop-blur-sm",
+              "opacity-0 transition-all duration-300 group-hover:opacity-100",
+              "hover:bg-black/70",
+              "focus:outline-none focus:ring-2 focus:ring-white/50"
+            )}
             aria-label="Scroll left"
           >
-            <ChevronLeft size={24} className="text-gray-900 dark:text-gray-100" />
+            <ChevronLeft size={40} className="text-white drop-shadow-lg" />
           </button>
         )}
 
-        {/* Right Arrow */}
+        {/* Right Arrow - Netflix style */}
         {showRightArrow && (
           <button
             onClick={() => scroll("right")}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
+            className={cn(
+              "absolute right-0 top-0 z-20 flex h-full w-12 items-center justify-center",
+              "bg-black/50 backdrop-blur-sm",
+              "opacity-0 transition-all duration-300 group-hover:opacity-100",
+              "hover:bg-black/70",
+              "focus:outline-none focus:ring-2 focus:ring-white/50"
+            )}
             aria-label="Scroll right"
           >
-            <ChevronRight size={24} className="text-gray-900 dark:text-gray-100" />
+            <ChevronRight size={40} className="text-white drop-shadow-lg" />
           </button>
         )}
 
@@ -100,18 +114,22 @@ export function MovieCarousel({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 scroll-smooth snap-x snap-mandatory"
+          className="flex gap-3 overflow-x-auto overflow-y-visible scrollbar-hide scroll-smooth pb-6 sm:gap-4"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
           }}
         >
-          {movies.map((movie) => (
+          {movies.map((movie, index) => (
             <div
               key={movie.id}
-              className="flex-shrink-0 w-48 snap-start"
+              className="flex-shrink-0 w-[160px] sm:w-[200px] md:w-[220px] lg:w-[240px]"
             >
-              <MovieCard movie={movie} showScore={showScore} />
+              <MovieCard
+                movie={movie}
+                showScore={showScore}
+                priority={index < 6} // Prioritize first 6 images
+              />
             </div>
           ))}
         </div>

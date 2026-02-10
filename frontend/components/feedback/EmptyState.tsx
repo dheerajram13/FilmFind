@@ -27,13 +27,13 @@ export function EmptyState({
           className
         )}
       >
-        <div className="rounded-full bg-gray-100 p-6 dark:bg-gray-800">
-          <Search className="text-gray-400 dark:text-gray-500" size={48} />
+        <div className="rounded-full border border-zinc-800 bg-zinc-900/70 p-6 shadow-lg">
+          <Search className="text-zinc-400" size={48} />
         </div>
-        <h3 className="mt-6 text-xl font-semibold text-gray-900 dark:text-gray-100">
+        <h3 className="mt-6 text-xl font-semibold text-white">
           No movies found
         </h3>
-        <p className="mt-2 max-w-md text-gray-600 dark:text-gray-400">
+        <p className="mt-2 max-w-md text-zinc-400">
           {query ? (
             <>
               We couldn&apos;t find any movies matching <strong>&quot;{query}&quot;</strong>.
@@ -43,7 +43,7 @@ export function EmptyState({
             "Try adjusting your search or filters to find what you're looking for."
           )}
         </p>
-        <div className="mt-6 text-sm text-gray-500 dark:text-gray-500">
+        <div className="mt-6 text-sm text-zinc-500">
           <p className="font-medium">Search tips:</p>
           <ul className="mt-2 space-y-1 text-left">
             <li>• Try using movie titles, genres, or themes</li>
@@ -62,13 +62,13 @@ export function EmptyState({
         className
       )}
     >
-      <div className="rounded-full bg-gradient-to-br from-blue-100 to-purple-100 p-6 dark:from-blue-900/20 dark:to-purple-900/20">
-        <Film className="text-blue-600 dark:text-blue-400" size={48} />
+      <div className="rounded-full border border-zinc-800 bg-zinc-900/70 p-6 shadow-lg">
+        <Film className="text-red-500" size={48} />
       </div>
-      <h3 className="mt-6 text-2xl font-bold text-gray-900 dark:text-gray-100">
+      <h3 className="mt-6 text-2xl font-semibold text-white">
         Discover Your Next Favorite Movie
       </h3>
-      <p className="mt-2 max-w-lg text-gray-600 dark:text-gray-400">
+      <p className="mt-2 max-w-lg text-zinc-400">
         Use natural language to search for movies. Try describing what you&apos;re in the mood
         for, like &quot;dark sci-fi thriller like Blade Runner&quot; or &quot;heartwarming animated films&quot;.
       </p>
@@ -83,7 +83,7 @@ export function EmptyState({
 
 function ExampleQuery({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-300">
       {text}
     </div>
   );

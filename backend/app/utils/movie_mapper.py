@@ -1,38 +1,42 @@
 """
-Movie mapping utilities.
+Movie/Media mapping utilities.
 
-Provides DRY utilities for converting Movie models to response schemas.
+Provides DRY utilities for converting Media models to response schemas.
 """
 
-from app.models.movie import Movie
+from app.models.media import Media, Movie
 from app.schemas.movie import MovieResponse, MovieSearchResult
 
 
-def movie_to_response(movie: Movie) -> MovieResponse:
+def movie_to_response(media: Media) -> MovieResponse:
     """
-    Convert Movie model to MovieResponse schema.
+    Convert Media model (Movie or TVShow) to MovieResponse schema.
 
     Args:
-        movie: Movie model instance
+        media: Media model instance (Movie or TVShow)
 
     Returns:
         MovieResponse schema
     """
+    # Get runtime from Movie-specific field if it's a Movie
+    runtime = getattr(media, 'runtime', None) if hasattr(media, 'runtime') else None
+
     return MovieResponse(
-        id=movie.id,
-        tmdb_id=movie.tmdb_id,
-        title=movie.title,
-        release_date=movie.release_date,
-        overview=movie.overview,
-        poster_path=movie.poster_path,
-        backdrop_path=movie.backdrop_path,
-        genres=movie.genres,
-        vote_average=movie.vote_average,
-        vote_count=movie.vote_count,
-        popularity=movie.popularity,
-        runtime=movie.runtime,
-        original_language=movie.original_language,
-        adult=movie.adult,
+        id=media.id,
+        tmdb_id=media.tmdb_id,
+        media_type=media.media_type,
+        title=media.title,
+        release_date=media.release_date,
+        overview=media.overview,
+        poster_path=media.poster_path,
+        backdrop_path=media.backdrop_path,
+        genres=media.genres,
+        vote_average=media.vote_average,
+        vote_count=media.vote_count,
+        popularity=media.popularity,
+        runtime=runtime,
+        original_language=media.original_language,
+        adult=media.adult,
     )
 
 
@@ -57,6 +61,7 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
     return MovieSearchResult(
         id=get_val(movie, "id") or get_val(movie, "movie_id"),
         tmdb_id=get_val(movie, "tmdb_id"),
+        media_type=get_val(movie, "media_type"),
         title=get_val(movie, "title"),
         release_date=get_val(movie, "release_date"),
         overview=get_val(movie, "overview"),

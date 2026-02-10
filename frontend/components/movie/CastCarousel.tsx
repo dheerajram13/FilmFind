@@ -25,7 +25,7 @@ export function CastCarousel({ cast, className }: CastCarouselProps) {
 
   return (
     <div className={cn("", className)}>
-      <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+      <h2 className="text-2xl font-semibold text-white mb-4">
         Cast
       </h2>
 
@@ -42,7 +42,7 @@ export function CastCarousel({ cast, className }: CastCarouselProps) {
                 className="flex-shrink-0 w-32 group cursor-pointer"
               >
                 {/* Profile Image */}
-                <div className="relative aspect-[2/3] mb-2 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:scale-105">
+                <div className="relative aspect-[2/3] mb-2 rounded-md overflow-hidden bg-zinc-800/60 transition-all duration-300 group-hover:scale-105">
                   {profileUrl ? (
                     <Image
                       src={profileUrl}
@@ -52,20 +52,20 @@ export function CastCarousel({ cast, className }: CastCarouselProps) {
                       sizes="128px"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-gray-400 dark:text-gray-500">
-                      <span className="text-4xl">👤</span>
+                    <div className="flex h-full items-center justify-center text-zinc-500">
+                      <span className="text-3xl">👤</span>
                     </div>
                   )}
                 </div>
 
                 {/* Actor Name */}
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 mb-1">
+                <p className="text-sm font-semibold text-white line-clamp-2 mb-1">
                   {member.name}
                 </p>
 
                 {/* Character Name */}
                 {member.character_name && (
-                  <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                  <p className="text-xs text-zinc-500 line-clamp-2">
                     {member.character_name}
                   </p>
                 )}

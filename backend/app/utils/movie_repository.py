@@ -1,13 +1,13 @@
 """
 Movie repository utilities.
 
-Provides DRY utilities for common movie database queries.
+Provides DRY utilities for common movie/media database queries.
 """
 
 from sqlalchemy.orm import Session
 
 from app.api.exceptions import NotFoundException
-from app.models.movie import Movie
+from app.models.media import Media, Movie
 
 
 def get_movie_by_id(db: Session, movie_id: int) -> Movie:
@@ -49,9 +49,9 @@ def get_all_movies(db: Session) -> list[Movie]:
     return db.query(Movie).all()
 
 
-def get_trending_movies(db: Session, skip: int = 0, limit: int = 20) -> tuple[list[Movie], int]:
+def get_trending_movies(db: Session, skip: int = 0, limit: int = 20) -> tuple[list[Media], int]:
     """
-    Get trending movies sorted by popularity.
+    Get trending media (movies and TV shows) sorted by popularity.
 
     Args:
         db: Database session
@@ -59,17 +59,17 @@ def get_trending_movies(db: Session, skip: int = 0, limit: int = 20) -> tuple[li
         limit: Maximum number of records to return
 
     Returns:
-        Tuple of (list of movies, total count)
+        Tuple of (list of media items, total count)
     """
-    movies = (
-        db.query(Movie)
-        .filter(Movie.popularity.is_not(None))
-        .order_by(Movie.popularity.desc())
+    media = (
+        db.query(Media)
+        .filter(Media.popularity.is_not(None))
+        .order_by(Media.popularity.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
 
-    total = db.query(Movie).filter(Movie.popularity.is_not(None)).count()
+    total = db.query(Media).filter(Media.popularity.is_not(None)).count()
 
-    return movies, total
+    return media, total

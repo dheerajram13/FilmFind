@@ -55,7 +55,7 @@ export function GenreSelector({
 
   return (
     <div className={cn("", className)}>
-      <label className="mb-3 block text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <label className="mb-3 block text-sm font-semibold text-white">
         Genres
       </label>
       <div className="grid grid-cols-2 gap-2">
@@ -69,8 +69,8 @@ export function GenreSelector({
               className={cn(
                 "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-all",
                 isSelected
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  ? "bg-red-600 text-white hover:bg-red-500"
+                  : "border border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
               )}
             >
               <span>{genre}</span>
@@ -80,7 +80,7 @@ export function GenreSelector({
         })}
       </div>
       {selectedGenres.length > 0 && (
-        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-xs text-zinc-500">
           {selectedGenres.length} genre{selectedGenres.length !== 1 ? "s" : ""} selected
         </p>
       )}

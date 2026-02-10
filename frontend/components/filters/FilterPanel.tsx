@@ -48,7 +48,7 @@ export function FilterPanel({
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm transition-opacity"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -57,27 +57,27 @@ export function FilterPanel({
       {/* Panel */}
       <div
         className={cn(
-          "fixed right-0 top-0 z-50 h-full w-full transform bg-white shadow-2xl transition-transform duration-300 dark:bg-gray-900 sm:w-96",
+          "fixed right-0 top-0 z-50 h-full w-full transform border-l border-zinc-800 bg-zinc-950/90 shadow-2xl backdrop-blur-xl transition-transform duration-300 sm:w-96",
           isOpen ? "translate-x-0" : "translate-x-full",
           className
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-zinc-800 p-4">
           <div className="flex items-center gap-2">
-            <Filter size={20} className="text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <Filter size={20} className="text-red-500" />
+            <h2 className="text-lg font-semibold text-white">
               Filters
             </h2>
             {hasActiveFilters && (
-              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
+              <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                 Active
               </span>
             )}
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white"
             aria-label="Close filters"
           >
             <X size={20} />
@@ -127,7 +127,7 @@ export function FilterPanel({
 
             {/* Adult Content Toggle */}
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <label className="text-sm font-semibold text-white">
                 Include Adult Content
               </label>
               <button
@@ -136,8 +136,8 @@ export function FilterPanel({
                 className={cn(
                   "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                   filters.include_adult
-                    ? "bg-blue-600"
-                    : "bg-gray-300 dark:bg-gray-700"
+                    ? "bg-red-600"
+                    : "bg-zinc-700"
                 )}
               >
                 <span
@@ -152,7 +152,7 @@ export function FilterPanel({
         </div>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/90 p-4">
           <div className="flex gap-3">
             <button
               onClick={handleReset}
@@ -160,8 +160,8 @@ export function FilterPanel({
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all",
                 hasActiveFilters
-                  ? "bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-                  : "cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600"
+                  ? "bg-zinc-800 text-white hover:bg-zinc-700"
+                  : "cursor-not-allowed bg-zinc-900 text-zinc-500"
               )}
             >
               <RotateCcw size={16} />
@@ -169,7 +169,7 @@ export function FilterPanel({
             </button>
             <button
               onClick={handleApply}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-red-500"
             >
               <Filter size={16} />
               Apply Filters

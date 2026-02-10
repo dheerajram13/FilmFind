@@ -40,7 +40,7 @@ import numpy as np
 from sqlalchemy import func
 
 from app.core.database import SessionLocal
-from app.models.movie import Movie
+from app.models.media import Media
 from app.services.vector_search import VectorSearchService
 
 
@@ -55,22 +55,22 @@ logger = logging.getLogger(__name__)
 
 def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
     """
-    Load all movie embeddings from database.
+    Load all media (movies and TV shows) embeddings from database.
 
     Returns:
-        Tuple of (embeddings_array, movie_ids)
-        - embeddings_array: numpy array of shape (n_movies, dimension)
-        - movie_ids: list of movie IDs
+        Tuple of (embeddings_array, media_ids)
+        - embeddings_array: numpy array of shape (n_items, dimension)
+        - media_ids: list of media IDs
     """
     logger.info("Loading embeddings from database...")
 
     db = SessionLocal()
     try:
-        # Get total count of movies with embeddings
-        total_count = db.query(func.count(Movie.id)).filter(
-            Movie.embedding_vector.isnot(None)
+        # Get total count of media with embeddings
+        total_count = db.query(func.count(Media.id)).filter(
+            Media.embedding_vector.isnot(None)
         ).scalar()
-        logger.info(f"Found {total_count} movies with embeddings in database")
+        logger.info(f"Found {total_count} media items with embeddings in database")
 
         if total_count == 0:
             msg = (
@@ -79,10 +79,10 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
             )
             raise ValueError(msg)
 
-        # Get embedding dimension from the first movie
-        query = db.query(Movie.id, Movie.embedding_vector).filter(
-            Movie.embedding_vector.isnot(None)
-        ).order_by(Movie.id)
+        # Get embedding dimension from the first media item
+        query = db.query(Media.id, Media.embedding_vector).filter(
+            Media.embedding_vector.isnot(None)
+        ).order_by(Media.id)
         first_row = query.first()
         if first_row is None:
             msg = "No embeddings found in database."

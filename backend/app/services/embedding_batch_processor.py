@@ -20,7 +20,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.movie import Movie
+from app.models.media import Media, Movie, TVShow
 from app.repositories.movie_repository import MovieRepository
 from app.services.embedding_service import get_embedding_service
 from app.services.text_preprocessor import TextPreprocessor
@@ -163,6 +163,80 @@ class EmbeddingBatchProcessor:
         logger.info(f"Batch processing complete: {stats}")
         return stats
 
+    def process_all_media(
+        self,
+        limit: int | None = None,
+        skip_existing: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Process all media (movies and TV shows) and generate embeddings.
+
+        Args:
+            limit: Optional limit on number of items to process
+            skip_existing: Skip items that already have embeddings (default: True)
+
+        Returns:
+            Statistics dictionary with processing results
+        """
+        logger.info("Starting batch embedding generation for ALL media...")
+
+        stats = {
+            "total_media": 0,
+            "processed": 0,
+            "skipped": 0,
+            "failed": 0,
+            "batches": 0,
+        }
+
+        # Get total count for progress tracking
+        if skip_existing:
+            total_count = self.db.query(Media).filter(Media.embedding_vector.is_(None)).count()
+            logger.info(f"Found {total_count} media items without embeddings")
+        else:
+            total_count = self.db.query(Media).count()
+            logger.info(f"Found {total_count} total media items")
+
+        stats["total_media"] = total_count
+
+        # Apply limit if specified
+        if limit:
+            total_count = min(total_count, limit)
+            logger.info(f"Processing limited to {total_count} media items")
+
+        # Process in database batches
+        offset = 0
+        while offset < total_count:
+            batch_limit = min(self.db_batch_size, total_count - offset)
+
+            # Fetch batch of media (both movies and TV shows)
+            if skip_existing:
+                media_items = self.db.query(Media).filter(
+                    Media.embedding_vector.is_(None)
+                ).limit(batch_limit).offset(offset).all()
+            else:
+                media_items = self.db.query(Media).limit(batch_limit).offset(offset).all()
+
+            if not media_items:
+                break
+
+            # Process this batch
+            batch_stats = self._process_batch(media_items)
+            stats["processed"] += batch_stats["processed"]
+            stats["skipped"] += batch_stats["skipped"]
+            stats["failed"] += batch_stats["failed"]
+            stats["batches"] += 1
+
+            logger.info(
+                f"Batch {stats['batches']}: Processed {batch_stats['processed']}, "
+                f"Skipped {batch_stats['skipped']}, Failed {batch_stats['failed']} "
+                f"({offset + len(media_items)}/{total_count})"
+            )
+
+            offset += len(media_items)
+
+        logger.info(f"Batch processing complete: {stats}")
+        return stats
+
     def _process_batch(self, movies: list[Movie]) -> dict:
         """
         Process a single batch of movies.
@@ -221,21 +295,22 @@ class EmbeddingBatchProcessor:
 
     def _store_embedding(self, movie_id: int, embedding: np.ndarray) -> None:
         """
-        Store embedding for a single movie.
+        Store embedding for a single media item (movie or TV show).
 
         Args:
-            movie_id: Movie ID
+            movie_id: Media ID
             embedding: 768-dimensional embedding vector
         """
         # Convert numpy array to list for JSON storage
         embedding_list = embedding.tolist()
 
-        # Update movie with embedding and metadata
-        self.movie_repo.update_embedding(
-            movie_id=movie_id,
-            embedding=embedding_list,
-            model_name=self.embedding_service.model_name,
-        )
+        # Update media with embedding directly (works for both Movie and TVShow)
+        media = self.db.query(Media).filter(Media.id == movie_id).first()
+        if not media:
+            raise ValueError(f"Media with ID {movie_id} not found")
+
+        media.embedding_vector = embedding_list
+        media.embedding_model = self.embedding_service.model_name
 
     def get_progress(self) -> dict:
         """

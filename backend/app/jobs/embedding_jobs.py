@@ -6,7 +6,7 @@ Weekly jobs to regenerate embeddings and rebuild FAISS index.
 
 from sqlalchemy.orm import Session
 
-from app.models.movie import Movie
+from app.models.media import Movie
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_search import VectorSearchService
 from app.utils.job_utils import JobStats, batch_process, execute_with_db

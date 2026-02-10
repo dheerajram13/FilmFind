@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import apiClient, { APIError } from "@/lib/api-client";
 import { Movie, TrendingMoviesResponse } from "@/types/api";
 
@@ -19,15 +19,25 @@ export function useTrending(limit = 20): UseTrendingResult {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const isMounted = useRef(true);
 
-  const fetchTrending = async () => {
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const fetchTrending = useCallback(async () => {
+    if (!isMounted.current) return;
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await apiClient.getTrending(0, limit) as TrendingMoviesResponse;
+      if (!isMounted.current) return;
       setMovies(response.movies);
     } catch (err) {
+      if (!isMounted.current) return;
       console.error("Error fetching trending movies:", err);
       if (err instanceof APIError) {
         setError(new Error(`Failed to fetch trending movies: ${err.message}`));
@@ -36,14 +46,15 @@ export function useTrending(limit = 20): UseTrendingResult {
       }
       setMovies([]);
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [limit]);
 
   useEffect(() => {
     fetchTrending();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limit]);
+  }, [fetchTrending]);
 
   return {
     movies,

@@ -31,11 +31,17 @@ export interface CastMember {
 }
 
 /**
- * Movie response schema
+ * Media type enum
+ */
+export type MediaType = 'movie' | 'tv';
+
+/**
+ * Movie response schema (also used for TV shows)
  */
 export interface Movie {
   id: number;
   tmdb_id: number;
+  media_type: MediaType;
   title: string;
   original_title?: string | null;
   overview: string | null;

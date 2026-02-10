@@ -22,28 +22,28 @@ export function CarouselSkeleton({
   className,
 }: CarouselSkeletonProps) {
   return (
-    <div className={cn("", className)}>
+    <div className={cn("relative", className)}>
       {/* Title Skeleton */}
       {title ? (
-        <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="mb-6 text-xl font-semibold text-white sm:text-2xl">
           {title}
         </h2>
       ) : (
-        <div className="mb-4 h-8 w-48 animate-pulse rounded bg-gray-300 dark:bg-gray-700" />
+        <div className="mb-6 h-8 w-48 animate-pulse rounded bg-zinc-800/50" />
       )}
 
       {/* Carousel Skeleton */}
-      <div className="flex gap-4 overflow-hidden pb-4">
+      <div className="flex gap-3 overflow-hidden pb-6 sm:gap-4">
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex-shrink-0 w-48">
+          <div key={i} className="w-[160px] flex-shrink-0 sm:w-[200px] md:w-[220px] lg:w-[240px]">
             {/* Poster */}
-            <div className="aspect-[2/3] animate-pulse rounded-lg bg-gray-300 dark:bg-gray-700 mb-2" />
+            <div className="aspect-[2/3] animate-pulse rounded-md bg-zinc-800/50 mb-2" />
 
             {/* Title */}
-            <div className="h-5 w-full animate-pulse rounded bg-gray-300 dark:bg-gray-700 mb-2" />
+            <div className="h-4 w-full animate-pulse rounded bg-zinc-800/30 mb-2" />
 
             {/* Metadata */}
-            <div className="h-4 w-3/4 animate-pulse rounded bg-gray-300 dark:bg-gray-700" />
+            <div className="h-3 w-3/4 animate-pulse rounded bg-zinc-800/30" />
           </div>
         ))}
       </div>

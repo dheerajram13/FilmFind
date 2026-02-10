@@ -52,14 +52,14 @@ export function YearRangeSlider({
   return (
     <div className={cn("", className)}>
       <div className="mb-3 flex items-center justify-between">
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <label className="block text-sm font-semibold text-white">
           Release Year
         </label>
         {hasValue && (
           <button
             type="button"
             onClick={handleClear}
-            className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-xs text-red-400 hover:text-red-300"
           >
             Clear
           </button>
@@ -69,7 +69,7 @@ export function YearRangeSlider({
       <div className="grid grid-cols-2 gap-3">
         {/* Min Year */}
         <div>
-          <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
+          <label className="mb-1 block text-xs text-zinc-500">
             From
           </label>
           <input
@@ -79,13 +79,13 @@ export function YearRangeSlider({
             placeholder={String(EARLIEST_YEAR)}
             min={EARLIEST_YEAR}
             max={maxYear ?? CURRENT_YEAR}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
         </div>
 
         {/* Max Year */}
         <div>
-          <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
+          <label className="mb-1 block text-xs text-zinc-500">
             To
           </label>
           <input
@@ -95,14 +95,14 @@ export function YearRangeSlider({
             placeholder={String(CURRENT_YEAR)}
             min={minYear ?? EARLIEST_YEAR}
             max={CURRENT_YEAR}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
         </div>
       </div>
 
       {/* Display current range */}
       {hasValue && (
-        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-xs text-zinc-500">
           {minYear ?? EARLIEST_YEAR} - {maxYear ?? CURRENT_YEAR}
         </p>
       )}

@@ -14,7 +14,7 @@ Design Patterns:
 import logging
 
 from app.core.config import settings
-from app.models.movie import Movie
+from app.models.media import Movie
 
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ Updates popularity scores for all movies from TMDB daily.
 
 from sqlalchemy.orm import Session
 
-from app.models.movie import Movie
+from app.models.media import Movie
 from app.services.TMDB.tmdb_service import TMDBService
 from app.utils.job_utils import JobStats, batch_process, execute_with_db
 from app.utils.logger import get_logger

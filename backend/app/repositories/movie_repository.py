@@ -16,7 +16,7 @@ from typing import Optional
 from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.movie import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Movie
 from app.repositories.base import BaseRepository
 
 

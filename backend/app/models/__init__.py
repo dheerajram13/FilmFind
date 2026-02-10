@@ -1,12 +1,12 @@
 """Database models"""
-from app.models.movie import Movie, Genre, Keyword, Cast, MovieGenre, MovieKeyword, MovieCast
+# New polymorphic models (production-grade schema)
+from app.models.media import Media, Movie, TVShow, Genre, Keyword, Cast
 
 __all__ = [
+    "Media",
     "Movie",
+    "TVShow",
     "Genre",
     "Keyword",
     "Cast",
-    "MovieGenre",
-    "MovieKeyword",
-    "MovieCast"
 ]

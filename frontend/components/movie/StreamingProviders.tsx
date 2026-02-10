@@ -30,18 +30,18 @@ export function StreamingProviders({ providers, className }: StreamingProvidersP
 
   return (
     <div className={cn("", className)}>
-      <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+      <h2 className="text-2xl font-semibold text-white mb-4">
         Where to Watch
       </h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-md">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
         {providerRegions.map(([region, data]) => {
           const regionData = data as Record<string, unknown>;
           const regionName = region.toUpperCase();
 
           return (
             <div key={region} className="mb-6 last:mb-0">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                 <Tv size={20} />
                 {regionName}
               </h3>
@@ -50,14 +50,14 @@ export function StreamingProviders({ providers, className }: StreamingProvidersP
                 {/* Streaming */}
                 {regionData.flatrate && Array.isArray(regionData.flatrate) ? (
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    <p className="text-sm font-medium text-zinc-400 mb-2">
                       Stream
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {(regionData.flatrate as Array<{ provider_name: string }>).map((provider, idx) => (
                         <span
                           key={idx}
-                          className="rounded-md bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                          className="rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300"
                         >
                           {String(provider.provider_name)}
                         </span>
@@ -69,14 +69,14 @@ export function StreamingProviders({ providers, className }: StreamingProvidersP
                 {/* Rent */}
                 {regionData.rent && Array.isArray(regionData.rent) ? (
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    <p className="text-sm font-medium text-zinc-400 mb-2">
                       Rent
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {(regionData.rent as Array<{ provider_name: string }>).map((provider, idx) => (
                         <span
                           key={idx}
-                          className="rounded-md bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                          className="rounded-full bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300"
                         >
                           {String(provider.provider_name)}
                         </span>
@@ -88,14 +88,14 @@ export function StreamingProviders({ providers, className }: StreamingProvidersP
                 {/* Buy */}
                 {regionData.buy && Array.isArray(regionData.buy) ? (
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    <p className="text-sm font-medium text-zinc-400 mb-2">
                       Buy
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {(regionData.buy as Array<{ provider_name: string }>).map((provider, idx) => (
                         <span
                           key={idx}
-                          className="rounded-md bg-purple-100 px-3 py-1.5 text-sm font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                          className="rounded-full bg-orange-500/15 px-3 py-1.5 text-xs font-semibold text-orange-300"
                         >
                           {String(provider.provider_name)}
                         </span>
@@ -109,7 +109,7 @@ export function StreamingProviders({ providers, className }: StreamingProvidersP
         })}
       </div>
 
-      <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+      <p className="mt-3 text-xs text-zinc-500">
         Streaming availability data provided by TMDB
       </p>
     </div>

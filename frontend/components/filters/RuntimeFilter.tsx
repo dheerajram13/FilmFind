@@ -53,7 +53,7 @@ export function RuntimeFilter({
 
   return (
     <div className={cn("", className)}>
-      <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
         <Clock size={16} />
         Runtime
       </label>
@@ -70,8 +70,8 @@ export function RuntimeFilter({
               className={cn(
                 "rounded-md px-3 py-2 text-xs font-medium transition-all",
                 isSelected
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  ? "bg-red-600 text-white hover:bg-red-500"
+                  : "border border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
               )}
             >
               {preset.label}
@@ -83,7 +83,7 @@ export function RuntimeFilter({
       {/* Custom Range */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
+          <label className="mb-1 block text-xs text-zinc-500">
             Min (minutes)
           </label>
           <input
@@ -93,12 +93,12 @@ export function RuntimeFilter({
             placeholder="0"
             min={0}
             max={maxRuntime ?? 500}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-gray-600 dark:text-gray-400">
+          <label className="mb-1 block text-xs text-zinc-500">
             Max (minutes)
           </label>
           <input
@@ -108,14 +108,14 @@ export function RuntimeFilter({
             placeholder="500"
             min={minRuntime ?? 0}
             max={500}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
         </div>
       </div>
 
       {/* Display current range */}
       {(minRuntime !== undefined || maxRuntime !== undefined) && (
-        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-xs text-zinc-500">
           {minRuntime ?? 0} - {maxRuntime ?? 500} minutes
         </p>
       )}

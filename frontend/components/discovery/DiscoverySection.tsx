@@ -39,13 +39,13 @@ export function DiscoverySection({
   return (
     <div className={cn("", className)}>
       <div className="mb-6 flex items-center gap-2">
-        <Sparkles className="text-purple-600 dark:text-purple-400" size={28} />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <Sparkles className="text-red-500" size={28} />
+        <h2 className="text-2xl font-semibold text-white">
           Discover with AI
         </h2>
       </div>
 
-      <p className="mb-6 text-gray-600 dark:text-gray-400">
+      <p className="mb-6 text-zinc-400">
         Try these AI-powered searches to find your next favorite movie
       </p>
 
@@ -54,15 +54,15 @@ export function DiscoverySection({
           <button
             key={prompt}
             onClick={() => onSearchSuggestion(prompt)}
-            className="group relative overflow-hidden rounded-lg border-2 border-gray-200 bg-white p-4 text-left transition-all hover:border-purple-500 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-400"
+            className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left transition-all hover:border-red-500/40 hover:-translate-y-0.5"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-orange-400/10 opacity-0 transition-opacity group-hover:opacity-100" />
             <div className="relative flex items-start gap-3">
               <Sparkles
                 size={20}
-                className="mt-0.5 flex-shrink-0 text-purple-600 opacity-60 group-hover:opacity-100 dark:text-purple-400"
+                className="mt-0.5 flex-shrink-0 text-red-400 opacity-60 group-hover:opacity-100"
               />
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <p className="text-sm font-medium text-white">
                 {prompt}
               </p>
             </div>

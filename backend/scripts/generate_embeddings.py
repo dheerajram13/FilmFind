@@ -81,8 +81,8 @@ def generate_embeddings(args):
             db_batch_size=args.db_batch_size,
         )
 
-        # Process movies
-        stats = processor.process_all_movies(
+        # Process all media (movies and TV shows)
+        stats = processor.process_all_media(
             limit=args.limit,
             skip_existing=not args.regenerate,
         )
@@ -91,18 +91,25 @@ def generate_embeddings(args):
         logger.info("=" * 60)
         logger.info("EMBEDDING GENERATION COMPLETE")
         logger.info("=" * 60)
-        logger.info(f"Total movies found:    {stats['total_movies']}")
+        logger.info(f"Total media found:     {stats['total_media']}")
         logger.info(f"Successfully processed: {stats['processed']}")
         logger.info(f"Skipped (invalid):     {stats['skipped']}")
         logger.info(f"Failed:                {stats['failed']}")
         logger.info(f"Total batches:         {stats['batches']}")
         logger.info("=" * 60)
 
-        # Show updated progress
-        progress = processor.get_progress()
-        logger.info(f"Overall progress: {progress['completed']}/{progress['total']} movies")
-        logger.info(f"Completion: {progress['percentage']:.2f}%")
-        logger.info(f"Remaining: {progress['remaining']} movies")
+        # Show updated progress by media type
+        from app.models.media import Media, Movie, TVShow
+        from sqlalchemy import func
+
+        movies_total = db.query(func.count(Movie.id)).scalar()
+        movies_with_emb = db.query(func.count(Movie.id)).filter(Movie.embedding_vector.isnot(None)).scalar()
+        tv_total = db.query(func.count(TVShow.id)).scalar()
+        tv_with_emb = db.query(func.count(TVShow.id)).filter(TVShow.embedding_vector.isnot(None)).scalar()
+
+        logger.info("Media type breakdown:")
+        logger.info(f"  Movies: {movies_with_emb}/{movies_total} ({movies_with_emb/movies_total*100:.1f}%)")
+        logger.info(f"  TV Shows: {tv_with_emb}/{tv_total} ({tv_with_emb/tv_total*100:.1f}%)")
 
     except KeyboardInterrupt:
         logger.warning("Process interrupted by user")

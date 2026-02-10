@@ -33,8 +33,8 @@ export function RatingFilter({
 }: RatingFilterProps) {
   return (
     <div className={cn("", className)}>
-      <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-        <Star size={16} className="fill-yellow-400 text-yellow-400" />
+      <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+        <Star size={16} className="fill-amber-400 text-amber-400" />
         Minimum Rating
       </label>
 
@@ -49,8 +49,8 @@ export function RatingFilter({
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium transition-all",
                 isSelected
-                  ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  ? "bg-amber-500 text-white hover:bg-amber-400"
+                  : "border border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
               )}
             >
               {option.label}
@@ -60,7 +60,7 @@ export function RatingFilter({
       </div>
 
       {minRating !== undefined && (
-        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-xs text-zinc-500">
           Showing movies rated {minRating}/10 or higher
         </p>
       )}

@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.api.cache_dependencies import get_cache_invalidator
-from app.models.movie import Movie
+from app.models.media import Movie
 from app.services.TMDB.tmdb_service import TMDBService
 from app.utils.job_utils import JobStats, execute_with_db
 from app.utils.logger import get_logger

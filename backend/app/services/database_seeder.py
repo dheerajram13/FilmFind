@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from app.core.database import SessionLocal
-from app.models.movie import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Movie
 from app.repositories.movie_repository import (
     CastRepository,
     GenreRepository,
