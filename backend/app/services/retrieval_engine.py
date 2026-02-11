@@ -300,6 +300,7 @@ class SemanticRetrievalEngine:
                 movie_dict = {
                     "movie_id": movie.id,
                     "tmdb_id": movie.tmdb_id,
+                    "media_type": movie.media_type,
                     "title": movie.title,
                     "original_title": movie.original_title,
                     "overview": movie.overview,
@@ -308,7 +309,7 @@ class SemanticRetrievalEngine:
                     if movie.release_date
                     else None,
                     "year": movie.year,
-                    "runtime": movie.runtime,
+                    "runtime": getattr(movie, 'runtime', None),
                     "rating": movie.vote_average,
                     "vote_count": movie.vote_count,
                     "popularity": movie.popularity,

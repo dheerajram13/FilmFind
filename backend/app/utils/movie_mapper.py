@@ -58,16 +58,33 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
             return obj.get(key, default)
         return getattr(obj, key, default)
 
+    # Convert genres from strings to GenreSchema objects if needed
+    genres_raw = get_val(movie, "genres", [])
+    from app.schemas.movie import GenreSchema
+
+    genres = []
+    if genres_raw:
+        for genre in genres_raw:
+            if isinstance(genre, str):
+                # Genre is a string name, convert to GenreSchema
+                genres.append(GenreSchema(id=0, name=genre))
+            elif isinstance(genre, dict):
+                # Genre is already a dict with id and name
+                genres.append(GenreSchema(**genre))
+            else:
+                # Genre is already a GenreSchema object
+                genres.append(genre)
+
     return MovieSearchResult(
         id=get_val(movie, "id") or get_val(movie, "movie_id"),
         tmdb_id=get_val(movie, "tmdb_id"),
-        media_type=get_val(movie, "media_type"),
+        media_type=get_val(movie, "media_type", "movie"),
         title=get_val(movie, "title"),
         release_date=get_val(movie, "release_date"),
         overview=get_val(movie, "overview"),
         poster_path=get_val(movie, "poster_path") or get_val(movie, "poster_url"),
         backdrop_path=get_val(movie, "backdrop_path") or get_val(movie, "backdrop_url"),
-        genres=get_val(movie, "genres", []),
+        genres=genres,
         vote_average=get_val(movie, "vote_average") or get_val(movie, "rating"),
         vote_count=get_val(movie, "vote_count"),
         popularity=get_val(movie, "popularity"),

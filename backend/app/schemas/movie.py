@@ -74,9 +74,9 @@ class MovieResponse(MovieBase):
 class MovieSearchResult(MovieResponse):
     """Movie search result with similarity scores"""
 
-    similarity_score: float = Field(..., description="Semantic similarity score")
+    similarity_score: float = Field(default=0.0, description="Semantic similarity score")
+    relevance_score: Optional[float] = Field(None, description="Final ranking score (alias for final_score)")
     match_explanation: Optional[str] = Field(None, description="Why this movie was recommended")
-    final_score: Optional[float] = Field(None, description="Final ranking score")
 
     class Config:
         from_attributes = True

@@ -239,8 +239,9 @@ async def search_movies(
     top_k = min(request.limit, len(scored_candidates))
     try:
         reranked_results = reranker.rerank(
-            query=request.query,
             candidates=scored_candidates[: top_k * RERANK_MULTIPLIER],
+            user_query=request.query,
+            parsed_query=query_intent,
             top_k=top_k,
         )
         logger.info(f"Re-ranked to top {len(reranked_results)} results")
@@ -363,7 +364,8 @@ async def get_similar_movies(
     )
 
     # Filter out the reference movie itself
-    similar_movies = [m for m in similar_movies if m.id != movie_id]
+    # Note: retrieval_engine returns dicts with "movie_id" key
+    similar_movies = [m for m in similar_movies if m.get("movie_id") != movie_id and m.get("id") != movie_id]
 
     # Apply pagination
     similar_movies = similar_movies[skip : skip + limit]
