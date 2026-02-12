@@ -8,6 +8,11 @@
 plan.md
 Project Overview
 
+# Design Files
+figma/
+Figma/
+*.fig
+
 # ==========================================
 # macOS Files
 # ==========================================
