@@ -537,12 +537,6 @@ filmfind/
 
 ## 📚 API Documentation
 
-### Base URL
-```
-Development: http://localhost:8000
-Production: https://api.filmfind.com
-```
-
 ### Endpoints
 
 #### 1. Search Movies

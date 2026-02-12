@@ -23,7 +23,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
-from app.models.media import Movie, Genre, Keyword, Cast
+from app.models.media import Movie, TVShow, Genre, Keyword, Cast
 from app.services.TMDB.tmdb_service import TMDBService
 
 
@@ -78,8 +78,8 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
             try:
                 # Check if already exists
                 existing = (
-                    db.query(Movie)
-                    .filter(Movie.tmdb_id == tv_show_data["tmdb_id"])
+                    db.query(TVShow)
+                    .filter(TVShow.tmdb_id == tv_show_data["tmdb_id"])
                     .first()
                 )
 
@@ -88,16 +88,14 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
                     skipped_count += 1
                     continue
 
-                # Create Movie (TV show) object
-                movie = Movie(
+                # Create TVShow object
+                tv_show = TVShow(
                     tmdb_id=tv_show_data["tmdb_id"],
-                    media_type="tv",
                     title=tv_show_data["title"],
                     original_title=tv_show_data.get("original_title"),
                     overview=tv_show_data.get("overview"),
                     tagline=tv_show_data.get("tagline"),
                     release_date=tv_show_data.get("release_date"),
-                    runtime=tv_show_data.get("runtime"),
                     adult=tv_show_data.get("adult", False),
                     popularity=tv_show_data.get("popularity"),
                     vote_average=tv_show_data.get("vote_average"),
@@ -106,9 +104,9 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
                     poster_path=tv_show_data.get("poster_path"),
                     backdrop_path=tv_show_data.get("backdrop_path"),
                     status=tv_show_data.get("status"),
-                    budget=0,
-                    revenue=0,
                     imdb_id=tv_show_data.get("imdb_id"),
+                    number_of_seasons=tv_show_data.get("number_of_seasons"),
+                    number_of_episodes=tv_show_data.get("number_of_episodes"),
                 )
 
                 # Add genres
@@ -117,7 +115,7 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
                     if not genre:
                         genre = Genre(name=genre_name)
                         db.add(genre)
-                    movie.genres.append(genre)
+                    tv_show.genres.append(genre)
 
                 # Add keywords
                 for keyword_data in tv_show_data.get("keywords", []):
@@ -129,7 +127,7 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
                     if not keyword:
                         keyword = Keyword(name=keyword_data["name"])
                         db.add(keyword)
-                    movie.keywords.append(keyword)
+                    tv_show.keywords.append(keyword)
 
                 # Add cast
                 for cast_data in tv_show_data.get("cast", []):
@@ -141,9 +139,9 @@ def ingest_tv_shows_to_db(max_pages: int = 10):
                             profile_path=cast_data.get("profile_path"),
                         )
                         db.add(cast)
-                    movie.cast_members.append(cast)
+                    tv_show.cast_members.append(cast)
 
-                db.add(movie)
+                db.add(tv_show)
                 db.commit()
                 saved_count += 1
 

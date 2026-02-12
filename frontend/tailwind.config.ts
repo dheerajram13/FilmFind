@@ -20,6 +20,10 @@ const config: Config = {
         "accent-2": "hsl(var(--accent-2))",
         "accent-3": "hsl(var(--accent-3))",
         ring: "hsl(var(--ring))",
+        primary: "#6C63FF",
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],

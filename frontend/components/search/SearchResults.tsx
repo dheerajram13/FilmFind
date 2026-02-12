@@ -1,11 +1,11 @@
 "use client";
 
-import { MovieCard } from "@/components/movie/MovieCard";
 import { MovieGridSkeleton } from "@/components/movie/MovieCardSkeleton";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";
-import { MovieSearchResult } from "@/types/api";
+import { MovieSearchResult, QueryInterpretation } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { SearchResultCard } from "@/components/search/SearchResultCard";
 
 interface SearchResultsProps {
   results: MovieSearchResult[];
@@ -14,6 +14,7 @@ interface SearchResultsProps {
   query: string;
   onRetry?: () => void;
   showScore?: boolean;
+  queryInterpretation?: QueryInterpretation;
   className?: string;
 }
 
@@ -34,6 +35,7 @@ export function SearchResults({
   query,
   onRetry,
   showScore = true,
+  queryInterpretation,
   className,
 }: SearchResultsProps) {
   // Loading state
@@ -71,33 +73,33 @@ export function SearchResults({
 
   // Results grid
   return (
-    <div className={cn("space-y-6", className)}>
-      {/* Results count */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 text-sm text-zinc-400 sm:px-6 lg:px-8">
-        <p>
-          Found <span className="font-semibold text-white">{results.length}</span>{" "}
-          {results.length === 1 ? "movie" : "movies"}
+    <div className={cn("space-y-8", className)}>
+      {/* Results header */}
+      <div className="px-2 sm:px-0">
+        <h3 className="mb-2 text-2xl font-bold text-white">Search Results</h3>
+        <p className="text-zinc-400">
+          Found{" "}
+          <span className="font-semibold text-purple-400">{results.length}</span>{" "}
+          {results.length === 1 ? "match" : "matches"}{" "}
           {query && (
             <>
-              {" "}
               for <span className="font-semibold text-white">&quot;{query}&quot;</span>
             </>
           )}
         </p>
-        <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-          Sorted by relevance
-        </span>
       </div>
 
-      {/* Results grid - matching carousel card sizes */}
-      <div className="flex flex-wrap gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        {results.map((movie) => (
-          <div
+      {/* Results grid */}
+      <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {results.map((movie, index) => (
+          <SearchResultCard
             key={movie.id}
-            className="w-[160px] sm:w-[200px] md:w-[220px] lg:w-[240px]"
-          >
-            <MovieCard movie={movie} showScore={showScore} />
-          </div>
+            movie={movie}
+            query={query}
+            queryInterpretation={queryInterpretation}
+            index={index}
+            showScore={showScore}
+          />
         ))}
       </div>
     </div>

@@ -1,12 +1,14 @@
 "use client";
 
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, Sparkles, Loader2 } from "lucide-react";
 import { useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
   value: string;
   onChange: (query: string) => void;
+  onSearch?: () => void;
   isLoading?: boolean;
   placeholder?: string;
   className?: string;
@@ -14,130 +16,104 @@ interface SearchBarProps {
 }
 
 /**
- * Interactive Animated SearchBar
+ * Premium SearchBar - Figma Design Implementation
  *
  * Features:
- * - Smooth icon transitions (search ↔ close)
- * - Background glow on focus
- * - Animated loading spinner
- * - Enhanced shadows and micro-interactions
- * - Clean, modern design
+ * - Glass morphism background (dark translucent)
+ * - Purple glow on focus
+ * - Constrained width (max-w-2xl)
+ * - 56px height (h-14)
+ * - Gradient search button
+ * - Smooth transitions
  */
 export function SearchBar({
   value,
   onChange,
+  onSearch,
   isLoading = false,
-  placeholder = "Search movies, shows, or actors...",
+  placeholder = "Describe the movie or show you're looking for...",
   className,
   id,
 }: SearchBarProps) {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isTyping = value.trim().length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-  };
-
-  const handleClear = () => {
-    onChange("");
-    inputRef.current?.focus();
+    onSearch?.();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
-      handleClear();
+      onChange("");
+      inputRef.current?.blur();
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={cn("relative w-full", className)}>
+    <form onSubmit={handleSubmit} className={cn("relative w-full max-w-3xl mx-auto", className)}>
+      {/* Glow effect on focus */}
+      <motion.div
+        className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-purple-600/20 blur-xl"
+        animate={{ opacity: isFocused ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+      />
+
+      {/* Search input container */}
       <div
         className={cn(
-          "relative flex items-center mx-auto",
-          "h-11 w-[380px]",
-          "rounded-md",
-          "border bg-white shadow-sm",
+          "relative bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 rounded-2xl overflow-hidden shadow-2xl",
           "transition-all duration-300",
-          isFocused
-            ? "shadow-md border-zinc-300"
-            : "border-zinc-200 hover:border-zinc-300"
+          isFocused && "border-purple-500/30"
         )}
       >
-        {/* Icon Container - with swap animation */}
-        <div className="relative flex items-center justify-center w-10 flex-shrink-0">
-          {/* Search Icon */}
-          <div
-            className={cn(
-              "absolute left-3 transition-all duration-300 ease-[cubic-bezier(0.694,0.048,0.335,1.000)]",
-              isFocused || isTyping
-                ? "opacity-0 scale-0 translate-x-4"
-                : "opacity-100 scale-100 translate-x-0"
-            )}
-          >
-            <Search size={18} className="text-zinc-400" strokeWidth={2} />
-          </div>
+        <div className="flex items-center px-6 py-5">
+          <Search className="w-6 h-6 text-zinc-400 mr-4 flex-shrink-0" />
 
-          {/* Close Icon - appears when focused/typing */}
-          <div
+          <input
+            ref={inputRef}
+            id={id}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="flex-1 bg-transparent text-white placeholder:text-zinc-500 outline-none text-lg"
+            aria-label="Search movies"
+            autoComplete="off"
+            spellCheck="false"
+          />
+
+          <button
+            type="submit"
+            disabled={isLoading}
             className={cn(
-              "absolute left-3 transition-all duration-300 ease-[cubic-bezier(0.694,0.048,0.335,1.000)]",
-              isFocused || isTyping
-                ? "opacity-100 scale-100 translate-x-0"
-                : "opacity-0 scale-0 -translate-x-4"
+              "ml-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-7 py-3.5 rounded-xl font-semibold text-base",
+              "flex items-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50",
+              "transition-all duration-300 hover:scale-105 active:scale-95",
+              "disabled:opacity-60 disabled:cursor-not-allowed"
             )}
           >
-            <button
-              type="button"
-              onClick={handleClear}
-              className="p-0.5 rounded-sm hover:bg-zinc-100 transition-colors"
-              aria-label="Clear search"
-            >
-              <X size={16} className="text-zinc-500" strokeWidth={2.5} />
-            </button>
-          </div>
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Sparkles className="w-5 h-5" />
+            )}
+            <span>Search</span>
+          </button>
         </div>
 
-        {/* Input */}
-        <input
-          ref={inputRef}
-          id={id}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className={cn(
-            "flex-1 bg-transparent px-2 py-2",
-            "text-sm text-zinc-900 placeholder:text-zinc-400",
-            "outline-none"
-          )}
-          aria-label="Search movies"
-          autoComplete="off"
-          spellCheck="false"
+        {/* Animated purple accent line at bottom */}
+        <motion.div
+          className="absolute bottom-0 left-8 h-[2px] bg-gradient-to-r from-purple-500 via-blue-500 to-transparent"
+          animate={{
+            width: isFocused ? "112px" : "0px",
+            opacity: isFocused ? 1 : 0
+          }}
+          transition={{ duration: 0.3 }}
         />
-
-        {/* Loading or Search Button */}
-        <div className="flex items-center pr-3">
-          {isLoading ? (
-            <Loader2 size={16} className="animate-spin text-zinc-400" strokeWidth={2} />
-          ) : value.trim() ? (
-            <button
-              type="submit"
-              className={cn(
-                "p-1.5 rounded-md",
-                "bg-red-600 hover:bg-red-700",
-                "text-white",
-                "transition-colors duration-150"
-              )}
-              aria-label="Search"
-            >
-              <Search size={14} strokeWidth={2.5} />
-            </button>
-          ) : null}
-        </div>
       </div>
     </form>
   );

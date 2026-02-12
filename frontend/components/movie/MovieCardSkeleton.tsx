@@ -13,7 +13,7 @@ export function MovieCardSkeleton({ className }: MovieCardSkeletonProps) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/60",
+        "overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/40",
         className
       )}
     >
@@ -55,16 +55,14 @@ export function MovieGridSkeleton({ count = 12, className }: MovieGridSkeletonPr
   return (
     <div
       className={cn(
-        "flex flex-wrap gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8",
+        "grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
         className
       )}
     >
       {Array.from({ length: count }).map((_, index) => (
-        <div
-          key={index}
-          className="w-[160px] sm:w-[200px] md:w-[220px] lg:w-[240px]"
-        >
+        <div key={index} className="space-y-3">
           <MovieCardSkeleton />
+          <div className="h-11 rounded-xl border border-zinc-800/30 bg-zinc-900/30 animate-pulse" />
         </div>
       ))}
     </div>

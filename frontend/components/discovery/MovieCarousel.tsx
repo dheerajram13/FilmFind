@@ -76,37 +76,41 @@ export function MovieCarousel({
 
       {/* Carousel Container */}
       <div className="group relative">
-        {/* Left Arrow - Netflix style */}
+        {/* Left Arrow - Figma circular glass button */}
         {showLeftArrow && (
           <button
             onClick={() => scroll("left")}
             className={cn(
-              "absolute left-0 top-0 z-20 flex h-full w-12 items-center justify-center",
-              "bg-black/50 backdrop-blur-sm",
-              "opacity-0 transition-all duration-300 group-hover:opacity-100",
-              "hover:bg-black/70",
-              "focus:outline-none focus:ring-2 focus:ring-white/50"
+              "absolute left-3 top-1/2 -translate-y-1/2 z-20",
+              "w-10 h-10 rounded-full",
+              "bg-black/40 backdrop-blur border border-white/10",
+              "opacity-0 transition-all duration-200 group-hover:opacity-100",
+              "hover:bg-black/60 hover:scale-110",
+              "flex items-center justify-center",
+              "focus:outline-none focus:ring-2 focus:ring-white/20"
             )}
             aria-label="Scroll left"
           >
-            <ChevronLeft size={40} className="text-white drop-shadow-lg" />
+            <ChevronLeft size={20} className="text-white" strokeWidth={2.5} />
           </button>
         )}
 
-        {/* Right Arrow - Netflix style */}
+        {/* Right Arrow - Figma circular glass button */}
         {showRightArrow && (
           <button
             onClick={() => scroll("right")}
             className={cn(
-              "absolute right-0 top-0 z-20 flex h-full w-12 items-center justify-center",
-              "bg-black/50 backdrop-blur-sm",
-              "opacity-0 transition-all duration-300 group-hover:opacity-100",
-              "hover:bg-black/70",
-              "focus:outline-none focus:ring-2 focus:ring-white/50"
+              "absolute right-3 top-1/2 -translate-y-1/2 z-20",
+              "w-10 h-10 rounded-full",
+              "bg-black/40 backdrop-blur border border-white/10",
+              "opacity-0 transition-all duration-200 group-hover:opacity-100",
+              "hover:bg-black/60 hover:scale-110",
+              "flex items-center justify-center",
+              "focus:outline-none focus:ring-2 focus:ring-white/20"
             )}
             aria-label="Scroll right"
           >
-            <ChevronRight size={40} className="text-white drop-shadow-lg" />
+            <ChevronRight size={20} className="text-white" strokeWidth={2.5} />
           </button>
         )}
 
