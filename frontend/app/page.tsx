@@ -9,7 +9,6 @@ import { StickySearchBar } from "@/components/search/StickySearchBar";
 import { SearchResults } from "@/components/search/SearchResults";
 import { MovieCard } from "@/components/movie/MovieCard";
 import { CarouselSkeleton } from "@/components/discovery/CarouselSkeleton";
-import { useDebounce } from "@/hooks/useDebounce";
 import { useTrending } from "@/hooks/useTrending";
 import apiClient, { APIError } from "@/lib/api-client";
 import { useFilters } from "@/lib/filter-context";
@@ -125,7 +124,7 @@ export default function Home() {
   }, [trendingMovies]);
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
+    <div className="min-h-screen w-full bg-black text-white overflow-x-hidden">
       {/* Ambient background gradients */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -216,8 +215,8 @@ export default function Home() {
                 transition={{ duration: 0.4 }}
               >
                 {/* Hero Section */}
-                <section className="pt-20 pb-16 px-6">
-                  <div className="max-w-7xl mx-auto text-center">
+                <section className="pt-20 pb-16">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -253,8 +252,8 @@ export default function Home() {
                 </section>
 
                 {/* Trending Section */}
-                <section className="py-16 px-6">
-                  <div className="max-w-7xl mx-auto">
+                <section className="py-16">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       whileInView={{ opacity: 1, x: 0 }}
@@ -279,8 +278,8 @@ export default function Home() {
                 </section>
 
                 {/* AI Recommendations Section */}
-                <section className="py-16 px-6">
-                  <div className="max-w-7xl mx-auto">
+                <section className="py-16">
+                  <div className="max-w-7xl mx-auto px-6">
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       whileInView={{ opacity: 1, x: 0 }}
@@ -323,7 +322,7 @@ export default function Home() {
                 />
                 <div className="max-w-7xl mx-auto">
                   <SearchResults
-                    query={debouncedQuery}
+                    query={submittedQuery}
                     results={results}
                     isLoading={isLoading}
                     error={error}
@@ -337,8 +336,8 @@ export default function Home() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-zinc-900/60 py-10 px-6 mt-16">
-          <div className="max-w-7xl mx-auto text-center text-zinc-500">
+        <footer className="border-t border-zinc-900/60 py-10 mt-16">
+          <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500">
             <p className="flex items-center justify-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-purple-500" />
               <span>Powered by advanced AI & semantic search technology</span>

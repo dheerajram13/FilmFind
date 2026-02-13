@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Play } from "lucide-react";
+import { Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Movie, MovieSearchResult } from "@/types/api";
@@ -68,13 +68,6 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
 
         {/* Gradient overlay - ONLY on hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
-
-        {/* Play button overlay - ONLY on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
-          <div className="w-16 h-16 rounded-full bg-purple-600/90 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-purple-500/50">
-            <Play className="w-8 h-8 text-white ml-1" fill="white" />
-          </div>
-        </div>
 
         {/* Rating badge - top-right, always visible */}
         {rating > 0 && (

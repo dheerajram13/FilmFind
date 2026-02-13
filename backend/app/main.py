@@ -44,6 +44,20 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, ANN201
     logger.info(f"API Prefix: {settings.API_PREFIX}")
     logger.info(f"Docs URL: {settings.API_PREFIX}/docs")
 
+    # Load FAISS index if it exists
+    try:
+        from app.services.vector_search import VectorSearchService
+        from pathlib import Path
+
+        vector_service = VectorSearchService()
+        if Path(settings.FAISS_INDEX_PATH).exists():
+            vector_service.load_index()
+            logger.info(f"FAISS index loaded successfully: {vector_service.size} vectors")
+        else:
+            logger.warning(f"FAISS index not found at {settings.FAISS_INDEX_PATH}. Vector search will not work until index is built.")
+    except Exception as e:
+        logger.error(f"Failed to load FAISS index: {e}")
+
     # Start background job scheduler
     start_scheduler()
 

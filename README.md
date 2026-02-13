@@ -50,6 +50,10 @@ FilmFind goes beyond traditional movie recommendation systems by:
 "Series like Dark"
 ```
 
+### UI Preview
+
+![FilmFind Home Page](images/home.png)
+
 ---
 
 ## ✨ Key Features
