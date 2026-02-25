@@ -65,6 +65,8 @@ const buildWhyPicked = (
   const toneSources =
     queryInterpretation?.tones?.length
       ? queryInterpretation.tones
+      : queryInterpretation?.tone
+        ? [queryInterpretation.tone]
       : queryInterpretation?.emotions?.length
         ? queryInterpretation.emotions
         : [];

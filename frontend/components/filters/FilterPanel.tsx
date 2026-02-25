@@ -33,6 +33,7 @@ export function FilterPanel({
   className,
 }: FilterPanelProps) {
   const { filters, updateFilter, resetFilters, hasActiveFilters } = useFilters();
+  const includeAdult = !(filters.exclude_adult ?? true);
 
   const handleApply = () => {
     onApply?.();
@@ -95,33 +96,33 @@ export function FilterPanel({
 
             {/* Languages */}
             <LanguageSelector
-              selectedLanguages={filters.languages || []}
-              onChange={(languages) => updateFilter("languages", languages)}
+              selectedLanguage={filters.language}
+              onChange={(language) => updateFilter("language", language)}
             />
 
             {/* Release Year */}
             <YearRangeSlider
-              minYear={filters.min_year}
-              maxYear={filters.max_year}
+              minYear={filters.year_min}
+              maxYear={filters.year_max}
               onChange={(min, max) => {
-                updateFilter("min_year", min);
-                updateFilter("max_year", max);
+                updateFilter("year_min", min);
+                updateFilter("year_max", max);
               }}
             />
 
             {/* Rating */}
             <RatingFilter
-              minRating={filters.min_rating}
-              onChange={(rating) => updateFilter("min_rating", rating)}
+              minRating={filters.rating_min}
+              onChange={(rating) => updateFilter("rating_min", rating)}
             />
 
             {/* Runtime */}
             <RuntimeFilter
-              minRuntime={filters.min_runtime}
-              maxRuntime={filters.max_runtime}
+              minRuntime={filters.runtime_min}
+              maxRuntime={filters.runtime_max}
               onChange={(min, max) => {
-                updateFilter("min_runtime", min);
-                updateFilter("max_runtime", max);
+                updateFilter("runtime_min", min);
+                updateFilter("runtime_max", max);
               }}
             />
 
@@ -132,10 +133,10 @@ export function FilterPanel({
               </label>
               <button
                 type="button"
-                onClick={() => updateFilter("include_adult", !filters.include_adult)}
+                onClick={() => updateFilter("exclude_adult", includeAdult)}
                 className={cn(
                   "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                  filters.include_adult
+                  includeAdult
                     ? "bg-red-600"
                     : "bg-zinc-700"
                 )}
@@ -143,7 +144,7 @@ export function FilterPanel({
                 <span
                   className={cn(
                     "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                    filters.include_adult ? "translate-x-6" : "translate-x-1"
+                    includeAdult ? "translate-x-6" : "translate-x-1"
                   )}
                 />
               </button>

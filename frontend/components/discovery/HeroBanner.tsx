@@ -4,7 +4,7 @@ import { Play, Info, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Movie } from "@/types/api";
-import { getBackdropUrl, getPosterUrl } from "@/lib/image-utils";
+import { getBackdropUrl } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 
 interface HeroBannerProps {
@@ -24,7 +24,6 @@ interface HeroBannerProps {
  */
 export function HeroBanner({ movie, className }: HeroBannerProps) {
   const backdropUrl = getBackdropUrl(movie.backdrop_path, "w1280");
-  const posterUrl = getPosterUrl(movie.poster_path, "w500");
   const releaseYear = movie.release_date
     ? new Date(movie.release_date).getFullYear()
     : null;

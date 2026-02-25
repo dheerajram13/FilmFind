@@ -32,7 +32,7 @@ export default function Home() {
 
   const activeFilterCount = useMemo(() => {
     return Object.entries(filters).reduce((count, [key, value]) => {
-      if (key === "include_adult") return count;
+      if (key === "exclude_adult") return count;
       if (Array.isArray(value)) return value.length > 0 ? count + 1 : count;
       if (value === undefined || value === null) return count;
       return count + 1;

@@ -41,7 +41,12 @@ from sqlalchemy import func
 
 from app.core.database import SessionLocal
 from app.models.media import Media
+from app.services.embedding_service import EmbeddingService
 from app.services.vector_search import VectorSearchService
+
+
+def get_embedding_service() -> EmbeddingService:
+    return EmbeddingService()
 
 
 # Setup logging

@@ -81,31 +81,33 @@ export interface SearchRequest {
  * Search filters schema
  */
 export interface SearchFilters {
+  year_min?: number;
+  year_max?: number;
+  rating_min?: number;
+  rating_max?: number;
+  runtime_min?: number;
+  runtime_max?: number;
+  language?: string;
   genres?: string[];
-  min_year?: number;
-  max_year?: number;
-  min_rating?: number;
-  max_rating?: number;
-  languages?: string[];
-  min_runtime?: number;
-  max_runtime?: number;
-  include_adult?: boolean;
+  streaming_providers?: string[];
+  exclude_adult?: boolean;
 }
 
 /**
  * Query interpretation response
  */
 export interface QueryInterpretation {
-  semantic_query: string;
-  intent?: string;
-  reference_titles?: string[];
-  genres?: string[];
-  tones?: string[];
-  emotions?: string[];
   themes?: string[];
-  undesired_genres?: string[];
-  undesired_tones?: string[];
-  undesired_emotions?: string[];
+  emotions?: string[];
+  reference_titles?: string[];
+  excluded?: string[];
+  tone?: string | null;
+  genre_hints?: string[];
+  raw_query?: string;
+  keywords?: string[];
+  plot_elements?: string[];
+  tones?: string[];
+  intent?: string;
   filters_applied?: Record<string, unknown>;
 }
 
@@ -115,15 +117,20 @@ export interface QueryInterpretation {
 export interface SearchResponse {
   query: string;
   results: MovieSearchResult[];
-  total: number;
+  count: number;
   query_interpretation?: QueryInterpretation;
 }
 
 /**
  * Similar movies response
  */
+export interface SimilarReferenceMovie {
+  id: number;
+  title: string;
+}
+
 export interface SimilarMoviesResponse {
-  reference_movie: Movie;
+  reference_movie: SimilarReferenceMovie;
   similar_movies: MovieSearchResult[];
   total: number;
 }
@@ -158,7 +165,10 @@ export interface HealthCheckResponse {
  * API Error response
  */
 export interface APIErrorResponse {
-  detail: string;
+  error?: string;
+  detail?: string;
+  type?: string;
+  details?: Record<string, unknown>;
   error_code?: string;
   error_type?: string;
 }

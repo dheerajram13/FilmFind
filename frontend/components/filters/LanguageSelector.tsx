@@ -4,8 +4,8 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LanguageSelectorProps {
-  selectedLanguages: string[];
-  onChange: (languages: string[]) => void;
+  selectedLanguage?: string;
+  onChange: (language: string | undefined) => void;
   className?: string;
 }
 
@@ -26,25 +26,21 @@ const LANGUAGES = [
 ];
 
 /**
- * LanguageSelector component for multi-selecting languages
+ * LanguageSelector component for choosing a single language
  *
  * Features:
  * - Grid layout with language buttons
  * - Visual selection state with checkmarks
- * - Multi-select support
+ * - Single-select support
  * - Uses ISO 639-1 language codes
  */
 export function LanguageSelector({
-  selectedLanguages,
+  selectedLanguage,
   onChange,
   className,
 }: LanguageSelectorProps) {
   const toggleLanguage = (code: string) => {
-    if (selectedLanguages.includes(code)) {
-      onChange(selectedLanguages.filter((lang) => lang !== code));
-    } else {
-      onChange([...selectedLanguages, code]);
-    }
+    onChange(selectedLanguage === code ? undefined : code);
   };
 
   return (
@@ -54,7 +50,7 @@ export function LanguageSelector({
       </label>
       <div className="grid grid-cols-2 gap-2">
         {LANGUAGES.map((language) => {
-          const isSelected = selectedLanguages.includes(language.code);
+          const isSelected = selectedLanguage === language.code;
           return (
             <button
               key={language.code}
@@ -73,9 +69,11 @@ export function LanguageSelector({
           );
         })}
       </div>
-      {selectedLanguages.length > 0 && (
+      {selectedLanguage && (
         <p className="mt-2 text-xs text-zinc-500">
-          {selectedLanguages.length} language{selectedLanguages.length !== 1 ? "s" : ""} selected
+          {
+            LANGUAGES.find((language) => language.code === selectedLanguage)?.name
+          } selected
         </p>
       )}
     </div>
