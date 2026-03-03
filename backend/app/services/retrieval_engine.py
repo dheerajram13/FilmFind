@@ -18,7 +18,7 @@ import logging
 from typing import Any
 
 from app.repositories.movie_repository import MovieRepository
-from app.schemas.query import ParsedQuery, QueryConstraints
+from app.schemas.query import MediaType, ParsedQuery, QueryConstraints
 from app.services.embedding_service import EmbeddingService
 from app.services.exceptions import FilmFindServiceError, SearchError
 from app.services.query_embedding import QueryEmbeddingService
@@ -383,6 +383,16 @@ class SemanticRetrievalEngine:
 
         if constraints is None:
             return filtered
+
+        # Filter: Media type (movie vs tv)
+        if constraints.media_type and constraints.media_type != MediaType.BOTH:
+            # DB stores "movie" or "tv"; MediaType enum uses "movie" or "tv_show"
+            target_db_type = "tv" if constraints.media_type == MediaType.TV_SHOW else "movie"
+            filtered = [c for c in filtered if c.get("media_type") == target_db_type]
+            logger.debug(
+                f"After media_type filter ({target_db_type}): "
+                f"{len(filtered)}/{len(candidates)} candidates"
+            )
 
         # Filter: Languages
         if constraints.languages:

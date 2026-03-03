@@ -192,8 +192,16 @@ async def search_movies(
     # Step 3: Retrieve candidates using semantic search
     try:
         # Create retrieval config with top_k
+        # When a specific media_type is requested, fetch the full index so the
+        # media_type filter (applied afterwards) has enough candidates to work with.
+        from app.schemas.query import MediaType as _MediaType
         from app.services.retrieval_engine import RetrievalConfig
-        retrieval_config = RetrievalConfig(top_k=request.limit * RETRIEVAL_MULTIPLIER)
+        _media_type = validated_constraints.media_type if validated_constraints else None
+        if _media_type and _media_type != _MediaType.BOTH:
+            _top_k = 200  # fetch everything; index is small (~199 vectors)
+        else:
+            _top_k = request.limit * RETRIEVAL_MULTIPLIER
+        retrieval_config = RetrievalConfig(top_k=_top_k)
         candidates = retrieval_engine.retrieve(
             parsed_query=query_intent,
             config=retrieval_config,

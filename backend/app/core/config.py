@@ -56,10 +56,16 @@ class Settings(BaseSettings):
     DEFAULT_DB_BATCH_SIZE: int = 100  # Batch size for database operations
 
     # LLM Provider
-    LLM_PROVIDER: str = Field(default="groq", description="LLM provider: 'groq' or 'ollama'")
+    LLM_PROVIDER: str = Field(default="gemini", description="Primary LLM provider: 'gemini', 'groq', or 'ollama'")
 
-    # Groq API (Free Tier)
-    GROQ_API_KEY: str = Field(default="", description="Groq API key for LLM inference")
+    # Gemini API (Primary - Free Tier: 15 RPM, 1500 RPD)
+    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MAX_TOKENS: int = 1024
+    GEMINI_TEMPERATURE: float = 0.7
+
+    # Groq API (Fallback - Free Tier)
+    GROQ_API_KEY: str = Field(default="", description="Groq API key for LLM inference (fallback)")
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_MAX_TOKENS: int = 1024
     GROQ_TEMPERATURE: float = 0.7

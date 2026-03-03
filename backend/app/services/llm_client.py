@@ -1,10 +1,11 @@
 """
-LLM client for interacting with Groq API and Ollama.
+LLM client for interacting with Gemini, Groq API, and Ollama.
 
 Provides a unified interface for LLM inference with support for:
-- Groq API (free tier: 30 req/min)
+- Google Gemini (primary, free tier: 15 RPM / 1500 RPD)
+- Groq API (fallback, free tier: 30 req/min)
 - Ollama (local, unlimited)
-- Automatic fallback and retry logic
+- Automatic provider chain fallback and retry logic
 """
 
 from typing import Any
@@ -25,12 +26,16 @@ from app.utils.retry import retry_with_backoff
 
 class LLMClient:
     """
-    Unified LLM client supporting Groq and Ollama.
+    Unified LLM client supporting Gemini, Groq, and Ollama.
+
+    Automatically tries providers in order (primary → fallback) until one succeeds.
+    Default chain when primary="gemini": gemini → groq.
 
     Provides methods for:
     - Generating completions
     - Structured JSON output
-    - Retry logic and fallback
+    - Automatic provider chain fallback
+    - Per-provider retry logic
     """
 
     def __init__(
@@ -45,31 +50,66 @@ class LLMClient:
         Initialize LLM client.
 
         Args:
-            provider: LLM provider ('groq' or 'ollama'). Defaults to settings.LLM_PROVIDER
-            api_key: API key for Groq (required for Groq)
-            base_url: Base URL for API (optional, uses defaults)
-            model: Model name (optional, uses defaults)
+            provider: Primary LLM provider ('gemini', 'groq', or 'ollama').
+                      Defaults to settings.LLM_PROVIDER
+            api_key: API key override for the primary provider
+            base_url: Base URL override (applies to Groq/Ollama only)
+            model: Model name override for the primary provider
             timeout: Request timeout in seconds
         """
-        self.provider = provider or settings.LLM_PROVIDER
         self.timeout = timeout
+        self._api_key_override = api_key
+        self._base_url_override = base_url
+        self._model_override = model
 
-        if self.provider == "groq":
-            self.api_key = api_key or settings.GROQ_API_KEY
-            self.base_url = base_url or "https://api.groq.com/openai/v1"
-            self.model = model or settings.GROQ_MODEL
-            if not self.api_key:
-                msg = "Groq API key is required"
-                raise LLMClientError(msg)
-        elif self.provider == "ollama":
-            self.api_key = None
-            self.base_url = base_url or settings.OLLAMA_BASE_URL
-            self.model = model or settings.OLLAMA_MODEL
+        requested = provider or settings.LLM_PROVIDER
+        self._provider_chain = self._build_provider_chain(requested)
+        # Keep self.provider as the first valid provider for logging/backward compat
+        self.provider = self._provider_chain[0]
+
+        logger.info(
+            f"Initialized LLM client: primary={self.provider}, "
+            f"chain={self._provider_chain}"
+        )
+
+    def _build_provider_chain(self, primary: str) -> list[str]:
+        """
+        Build the ordered list of providers to try, skipping any without credentials.
+
+        When primary is 'gemini': chain is [gemini, groq] (if keys available).
+        When primary is 'groq': chain is [groq].
+        When primary is 'ollama': chain is [ollama].
+        """
+        chain: list[str] = []
+
+        if primary == "gemini":
+            gemini_key = self._api_key_override or settings.GEMINI_API_KEY
+            if gemini_key:
+                chain.append("gemini")
+            else:
+                logger.warning("GEMINI_API_KEY not set — skipping Gemini provider")
+            # Always add Groq as fallback if key exists
+            if settings.GROQ_API_KEY:
+                chain.append("groq")
+            elif not chain:
+                pass  # Will raise below if chain is empty
+        elif primary == "groq":
+            groq_key = self._api_key_override or settings.GROQ_API_KEY
+            if groq_key:
+                chain.append("groq")
+            else:
+                logger.warning("GROQ_API_KEY not set — skipping Groq provider")
+        elif primary == "ollama":
+            chain.append("ollama")
         else:
-            msg = f"Unsupported provider: {self.provider}"
+            msg = f"Unsupported provider: {primary}"
             raise LLMClientError(msg)
 
-        logger.info(f"Initialized LLM client: provider={self.provider}, model={self.model}")
+        if not chain:
+            msg = "No LLM providers configured with valid credentials. Set GEMINI_API_KEY or GROQ_API_KEY."
+            raise LLMClientError(msg)
+
+        return chain
 
     def generate_completion(
         self,
@@ -80,32 +120,133 @@ class LLMClient:
         response_format: dict[str, Any] | None = None,
     ) -> str:
         """
-        Generate completion from LLM.
+        Generate completion from LLM, trying providers in chain order.
 
         Args:
             prompt: User prompt
             system_prompt: System prompt (optional)
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens to generate
-            response_format: Response format (for structured output)
+            response_format: Response format hint ({"type": "json_object"} for JSON mode)
 
         Returns:
             Generated text completion
 
         Raises:
-            LLMClientError: If request fails
-            LLMRateLimitError: If rate limit is hit
+            LLMClientError: If all providers in the chain fail
         """
-        if self.provider == "groq":
-            return self._groq_completion_with_retry(
-                prompt, system_prompt, temperature, max_tokens, response_format
+        use_json_mode = response_format is not None and response_format.get("type") == "json_object"
+        last_error: Exception | None = None
+
+        for provider in self._provider_chain:
+            try:
+                logger.debug(f"Trying LLM provider: {provider}")
+
+                if provider == "gemini":
+                    result = self._gemini_completion_with_retry(
+                        prompt, system_prompt, temperature, max_tokens, use_json_mode
+                    )
+                elif provider == "groq":
+                    result = self._groq_completion_with_retry(
+                        prompt, system_prompt, temperature, max_tokens,
+                        {"type": "json_object"} if use_json_mode else None,
+                    )
+                elif provider == "ollama":
+                    result = self._ollama_completion_with_retry(
+                        prompt, system_prompt, temperature, max_tokens
+                    )
+                else:
+                    continue
+
+                logger.info(f"LLM call succeeded with provider: {provider}")
+                return result
+
+            except Exception as e:
+                logger.warning(
+                    f"LLM provider '{provider}' failed: {e}. "
+                    f"{'Trying next provider...' if provider != self._provider_chain[-1] else 'No more providers.'}"
+                )
+                last_error = e
+                continue
+
+        msg = f"All LLM providers failed. Last error: {last_error}"
+        raise LLMClientError(msg) from last_error
+
+    # -------------------------------------------------------------------------
+    # Gemini
+    # -------------------------------------------------------------------------
+
+    @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMRetriableError,))
+    def _gemini_completion_with_retry(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        temperature: float,
+        max_tokens: int,
+        use_json_mode: bool,
+    ) -> str:
+        """Wrapper with retry logic for Gemini completions."""
+        return self._gemini_completion(
+            prompt, system_prompt, temperature, max_tokens, use_json_mode
+        )
+
+    def _gemini_completion(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        temperature: float,
+        max_tokens: int,
+        use_json_mode: bool,
+    ) -> str:
+        """Generate completion using Google Gemini API (google-genai SDK)."""
+        try:
+            from google import genai  # lazy import
+            from google.genai import types as genai_types
+        except ImportError as e:
+            msg = "google-genai package not installed. Run: pip install google-genai>=1.0.0"
+            raise LLMClientError(msg) from e
+
+        api_key = self._api_key_override or settings.GEMINI_API_KEY
+        model_name = self._model_override or settings.GEMINI_MODEL
+
+        try:
+            client = genai.Client(api_key=api_key)
+
+            config = genai_types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                response_mime_type="application/json" if use_json_mode else "text/plain",
+                system_instruction=system_prompt,
             )
-        if self.provider == "ollama":
-            return self._ollama_completion_with_retry(
-                prompt, system_prompt, temperature, max_tokens
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
             )
-        msg = f"Unsupported provider: {self.provider}"
-        raise LLMClientError(msg)
+
+            if not response.text:
+                msg = "Gemini returned empty response (possibly blocked by safety filters)"
+                raise LLMClientError(msg)
+
+            return response.text
+
+        except LLMClientError:
+            raise
+        except Exception as e:
+            error_str = str(e).lower()
+            # Detect rate limit / quota errors
+            if "429" in str(e) or "quota" in error_str or ("rate" in error_str and "limit" in error_str):
+                logger.warning(f"Gemini rate limit hit: {e}")
+                msg = "Rate limit exceeded for Gemini API"
+                raise LLMRateLimitError(msg) from e
+            logger.error(f"Gemini API error: {e}")
+            msg = f"Gemini API error: {e}"
+            raise LLMClientError(msg) from e
+
+    # -------------------------------------------------------------------------
+    # Groq
+    # -------------------------------------------------------------------------
 
     @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMRetriableError,))
     def _groq_completion_with_retry(
@@ -135,9 +276,13 @@ class LLMClient:
         response_format: dict[str, Any] | None,
     ) -> str:
         """Generate completion using Groq API"""
-        url = f"{self.base_url}/chat/completions"
+        api_key = self._api_key_override or settings.GROQ_API_KEY
+        base_url = self._base_url_override or "https://api.groq.com/openai/v1"
+        model = self._model_override or settings.GROQ_MODEL
+
+        url = f"{base_url}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
@@ -147,13 +292,12 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
 
         payload: dict[str, Any] = {
-            "model": self.model,
+            "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
 
-        # Add response_format if provided (for JSON mode)
         if response_format:
             payload["response_format"] = response_format
 
@@ -171,7 +315,6 @@ class LLMClient:
                 return data["choices"][0]["message"]["content"]
 
         except LLMRateLimitError:
-            # Re-raise rate limit errors without wrapping
             raise
         except httpx.HTTPStatusError as e:
             logger.error(f"Groq API error: {e.response.status_code} - {e.response.text}")
@@ -182,12 +325,15 @@ class LLMClient:
             msg = "Groq API request timed out"
             raise LLMClientError(msg) from e
         except LLMClientError:
-            # Re-raise LLMClientError as-is
             raise
         except Exception as e:
             logger.error(f"Unexpected error calling Groq: {e}")
             msg = f"Unexpected error: {e}"
             raise LLMClientError(msg) from e
+
+    # -------------------------------------------------------------------------
+    # Ollama
+    # -------------------------------------------------------------------------
 
     @retry_with_backoff(max_retries=2, initial_delay=1.0, exceptions=(LLMRetriableError,))
     def _ollama_completion_with_retry(
@@ -213,15 +359,16 @@ class LLMClient:
         max_tokens: int,
     ) -> str:
         """Generate completion using Ollama"""
-        url = f"{self.base_url}/api/generate"
+        base_url = self._base_url_override or settings.OLLAMA_BASE_URL
+        model = self._model_override or settings.OLLAMA_MODEL
+        url = f"{base_url}/api/generate"
 
-        # Combine system and user prompts
         full_prompt = prompt
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
 
         payload = {
-            "model": self.model,
+            "model": model,
             "prompt": full_prompt,
             "temperature": temperature,
             "num_predict": max_tokens,
@@ -252,6 +399,10 @@ class LLMClient:
             msg = f"Unexpected error: {e}"
             raise LLMClientError(msg) from e
 
+    # -------------------------------------------------------------------------
+    # JSON helper
+    # -------------------------------------------------------------------------
+
     def generate_json(
         self,
         prompt: str,
@@ -261,6 +412,8 @@ class LLMClient:
     ) -> dict[str, Any]:
         """
         Generate structured JSON output from LLM.
+
+        Enables JSON mode for providers that support it (Gemini, Groq).
 
         Args:
             prompt: User prompt (should ask for JSON output)
@@ -272,12 +425,11 @@ class LLMClient:
             Parsed JSON as dictionary
 
         Raises:
-            LLMClientError: If JSON parsing fails
+            LLMClientError: If all providers fail or JSON parsing fails
         """
-        # For Groq, we can use response_format
-        response_format = {"type": "json_object"} if self.provider == "groq" else None
+        # Signal JSON mode — each provider interprets this in its own way
+        response_format = {"type": "json_object"}
 
-        # Add JSON instruction to prompt if not already present
         if "json" not in prompt.lower():
             prompt = f"{prompt}\n\nRespond with valid JSON only."
 
@@ -289,14 +441,12 @@ class LLMClient:
             response_format=response_format,
         )
 
-        # Parse JSON using utility function
         try:
             return safe_json_parse(
                 text=completion, extract_markdown=True, error_context=f"{self.provider} LLM"
             )
         except LLMInvalidResponseError:
-            # Log the failed response for debugging
-            logger.error(f"Failed to parse JSON from {self.provider} LLM\nResponse: {completion}")
+            logger.error(f"Failed to parse JSON from LLM\nResponse: {completion}")
             raise
 
     def __enter__(self) -> "LLMClient":

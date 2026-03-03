@@ -177,7 +177,7 @@ class ParsedQuery(BaseModel):
 class QueryParserConfig(BaseModel):
     """Configuration for query parser"""
 
-    llm_provider: str = Field(default="groq", description="LLM provider (groq or ollama)")
+    llm_provider: str = Field(default="gemini", description="LLM provider (gemini, groq, or ollama)")
     enable_fallback: bool = Field(
         default=True, description="Enable rule-based fallback if LLM fails"
     )
