@@ -16,7 +16,7 @@ from typing import Optional
 from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.media import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Media, Movie
 from app.repositories.base import BaseRepository
 
 
@@ -448,24 +448,26 @@ class MovieRepository(BaseRepository[Movie]):
 
     def find_by_ids(
         self, movie_ids: list[int], eager_load_relations: bool = True
-    ) -> list[Movie]:
+    ) -> list[Media]:
         """
-        Get multiple movies by internal database IDs (bulk fetch).
+        Get multiple media items (movies or TV shows) by internal database IDs.
+
+        Queries the Media base class so both Movie and TVShow records are returned.
 
         Args:
-            movie_ids: List of internal movie IDs
+            movie_ids: List of internal media IDs
             eager_load_relations: Whether to eagerly load genres, keywords, cast
 
         Returns:
-            List of movies (may be fewer than input if some don't exist)
+            List of Media instances (may be fewer than input if some don't exist)
         """
-        query = self.db.query(Movie).filter(Movie.id.in_(movie_ids))
+        query = self.db.query(Media).filter(Media.id.in_(movie_ids))
 
         if eager_load_relations:
             query = query.options(
-                selectinload(Movie.genres),
-                selectinload(Movie.keywords),
-                selectinload(Movie.cast_members),
+                selectinload(Media.genres),
+                selectinload(Media.keywords),
+                selectinload(Media.cast_members),
             )
 
         return query.all()

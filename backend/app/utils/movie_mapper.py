@@ -58,22 +58,46 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
             return obj.get(key, default)
         return getattr(obj, key, default)
 
-    # Convert genres from strings to GenreSchema objects if needed
-    genres_raw = get_val(movie, "genres", [])
-    from app.schemas.movie import GenreSchema
+    from app.schemas.movie import CastSchema, GenreSchema, KeywordSchema
 
+    # Convert genres (string names or ORM objects or dicts → GenreSchema)
+    genres_raw = get_val(movie, "genres", [])
     genres = []
     if genres_raw:
         for genre in genres_raw:
             if isinstance(genre, str):
-                # Genre is a string name, convert to GenreSchema
                 genres.append(GenreSchema(id=0, name=genre))
             elif isinstance(genre, dict):
-                # Genre is already a dict with id and name
                 genres.append(GenreSchema(**genre))
             else:
-                # Genre is already a GenreSchema object
                 genres.append(genre)
+
+    # Convert keywords (string names or ORM objects → KeywordSchema)
+    keywords_raw = get_val(movie, "keywords", [])
+    keywords = []
+    if keywords_raw:
+        for kw in keywords_raw:
+            if isinstance(kw, str):
+                keywords.append(KeywordSchema(id=0, name=kw))
+            elif isinstance(kw, dict):
+                keywords.append(KeywordSchema(**kw))
+            else:
+                keywords.append(kw)
+
+    # Convert cast — retrieval_engine stores as "cast" (list of dicts with name/profile_path)
+    # ORM objects have cast_members attribute
+    cast_raw = get_val(movie, "cast_members", None) or get_val(movie, "cast", [])
+    cast_members = []
+    if cast_raw:
+        for c in cast_raw[:5]:  # top 5
+            if isinstance(c, dict):
+                cast_members.append(CastSchema(
+                    id=c.get("id", 0),
+                    name=c.get("name", ""),
+                    profile_path=c.get("profile_path"),
+                ))
+            else:
+                cast_members.append(c)
 
     return MovieSearchResult(
         id=get_val(movie, "id") or get_val(movie, "movie_id"),
@@ -85,11 +109,14 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
         poster_path=get_val(movie, "poster_path") or get_val(movie, "poster_url"),
         backdrop_path=get_val(movie, "backdrop_path") or get_val(movie, "backdrop_url"),
         genres=genres,
+        keywords=keywords,
+        cast_members=cast_members,
         vote_average=get_val(movie, "vote_average") or get_val(movie, "rating"),
         vote_count=get_val(movie, "vote_count"),
         popularity=get_val(movie, "popularity"),
         similarity_score=get_val(movie, "similarity_score", 0.0),
         relevance_score=get_val(movie, "final_score", 0.0),
+        match_explanation=get_val(movie, "match_explanation"),
     )
 
 

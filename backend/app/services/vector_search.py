@@ -86,6 +86,9 @@ class VectorSearchService:
         # Metadata: Maps index position -> movie_id
         self._id_map: list[int] = []
 
+        # Metadata: Maps movie_id -> media_type ('movie' or 'tv')
+        self._type_map: dict[int, str] = {}
+
         # Stats
         self._index_size = 0
 
@@ -124,6 +127,7 @@ class VectorSearchService:
         movie_ids: list[int],
         m: int = 32,
         ef_construction: int = 200,
+        media_types: list[str] | None = None,
     ) -> None:
         """
         Build FAISS HNSW index from embeddings.
@@ -139,6 +143,7 @@ class VectorSearchService:
             movie_ids: List of movie IDs corresponding to embeddings
             m: HNSW graph connectivity (typical: 16-64)
             ef_construction: Search depth during construction (typical: 100-500)
+            media_types: Optional list of media types ('movie' or 'tv') parallel to movie_ids
 
         Raises:
             IndexValidationError: If embeddings and movie_ids don't match
@@ -191,6 +196,12 @@ class VectorSearchService:
             self._index = index
             self._id_map = list(movie_ids)
             self._index_size = len(movie_ids)
+
+            # Build type map if media_types provided
+            if media_types and len(media_types) == len(movie_ids):
+                self._type_map = {mid: mtype for mid, mtype in zip(movie_ids, media_types)}
+            else:
+                self._type_map = {}
 
             logger.info(f"FAISS index built successfully with {self._index_size} vectors")
 
@@ -276,6 +287,12 @@ class VectorSearchService:
             msg = f"Vector search failed: {e}"
             raise SearchError(msg) from e
 
+    def get_ids_by_media_type(self, media_type: str) -> set[int]:
+        """Return set of media IDs that match the given media_type ('movie' or 'tv')."""
+        if not self._type_map:
+            return set()
+        return {mid for mid, mtype in self._type_map.items() if mtype == media_type}
+
     def save_index(self) -> None:
         """
         Save FAISS index and metadata to disk.
@@ -308,6 +325,7 @@ class VectorSearchService:
                 "id_map": self._id_map,
                 "index_size": self._index_size,
                 "dimension": self.dimension,
+                "type_map": self._type_map,
             }
             with open(self.metadata_path, "wb") as f:
                 pickle.dump(metadata, f)
@@ -361,6 +379,7 @@ class VectorSearchService:
 
             self._id_map = metadata["id_map"]
             self._index_size = metadata["index_size"]
+            self._type_map = metadata.get("type_map", {})
 
             # Validate
             if metadata["dimension"] != self.dimension:
@@ -415,6 +434,7 @@ class VectorSearchService:
         """
         self._index = None
         self._id_map = []
+        self._type_map = {}
         self._index_size = 0
         logger.info("Index cleared from memory")
 

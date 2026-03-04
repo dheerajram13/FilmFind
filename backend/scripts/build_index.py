@@ -58,14 +58,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
+def load_embeddings_from_db() -> tuple[np.ndarray, list[int], list[str]]:
     """
     Load all media (movies and TV shows) embeddings from database.
 
     Returns:
-        Tuple of (embeddings_array, media_ids)
+        Tuple of (embeddings_array, media_ids, media_types)
         - embeddings_array: numpy array of shape (n_items, dimension)
         - media_ids: list of media IDs
+        - media_types: list of media types ('movie' or 'tv') parallel to media_ids
     """
     logger.info("Loading embeddings from database...")
 
@@ -85,7 +86,7 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
             raise ValueError(msg)
 
         # Get embedding dimension from the first media item
-        query = db.query(Media.id, Media.embedding_vector).filter(
+        query = db.query(Media.id, Media.media_type, Media.embedding_vector).filter(
             Media.embedding_vector.isnot(None)
         ).order_by(Media.id)
         first_row = query.first()
@@ -99,16 +100,21 @@ def load_embeddings_from_db() -> tuple[np.ndarray, list[int]]:
         # Pre-allocate numpy array for better memory efficiency
         embeddings_array = np.empty((total_count, embedding_dim), dtype=np.float32)
         movie_ids = []
+        media_types = []
 
         # Stream results in batches to avoid loading all data into memory at once
-        for i, (movie_id, embedding_vector) in enumerate(query.yield_per(1000)):
+        for i, (movie_id, media_type, embedding_vector) in enumerate(query.yield_per(1000)):
             movie_ids.append(movie_id)
-            # Direct assignment - no intermediate list conversion needed
+            media_types.append(media_type)
             embeddings_array[i] = embedding_vector
 
-        logger.info(f"Loaded {len(movie_ids)} embeddings with shape {embeddings_array.shape}")
+        # Log breakdown by type
+        type_counts = {}
+        for mt in media_types:
+            type_counts[mt] = type_counts.get(mt, 0) + 1
+        logger.info(f"Loaded {len(movie_ids)} embeddings with shape {embeddings_array.shape}: {type_counts}")
 
-        return embeddings_array, movie_ids
+        return embeddings_array, movie_ids, media_types
 
     except Exception as e:
         logger.error(f"Failed to load embeddings: {e}")
@@ -123,6 +129,7 @@ def build_index(
     m: int = 32,
     ef_construction: int = 200,
     force: bool = False,
+    media_types: list[str] | None = None,
 ) -> VectorSearchService:
     """
     Build FAISS index from embeddings.
@@ -133,6 +140,7 @@ def build_index(
         m: HNSW graph connectivity
         ef_construction: Construction search depth
         force: Overwrite existing index
+        media_types: Optional list of media types parallel to movie_ids
 
     Returns:
         VectorSearchService instance with built index
@@ -150,7 +158,7 @@ def build_index(
     start_time = time.time()
 
     # Build index
-    service.build_index(embeddings, movie_ids, m=m, ef_construction=ef_construction)
+    service.build_index(embeddings, movie_ids, m=m, ef_construction=ef_construction, media_types=media_types)
 
     build_time = time.time() - start_time
     logger.info(f"Index built in {build_time:.2f} seconds")
@@ -376,7 +384,7 @@ HNSW Parameters:
 
         else:
             # Build new index
-            embeddings, movie_ids = load_embeddings_from_db()
+            embeddings, movie_ids, media_types = load_embeddings_from_db()
 
             service = build_index(
                 embeddings,
@@ -384,6 +392,7 @@ HNSW Parameters:
                 m=args.m,
                 ef_construction=args.ef_construction,
                 force=args.force,
+                media_types=media_types,
             )
 
             logger.info("\n" + "=" * 60)

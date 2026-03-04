@@ -569,8 +569,13 @@ def _merge_constraints(parsed_query: ParsedQuery, filters: SearchFilters | None)
     Returns:
         Merged constraints
     """
-    # Start with parsed constraints
+    # Start with parsed constraints, but clear genres — genres extracted by LLM are
+    # semantic signals used by the embedding model, not hard filter requirements.
+    # Hard genre filtering is too strict and causes 0 results (e.g. requiring Drama AND
+    # Mystery AND Thriller simultaneously). Genres are only hard-filtered when the user
+    # explicitly provides them via request.filters.
     merged_constraints = parsed_query.constraints.copy(deep=True)
+    merged_constraints.genres = []
 
     if not filters:
         return merged_constraints

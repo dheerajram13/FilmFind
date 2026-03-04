@@ -23,6 +23,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.exceptions import FilmFindServiceError, SearchError
 from app.services.query_embedding import QueryEmbeddingService
 from app.services.vector_search import VectorSearchService
+from typing import Optional
 
 
 logger = logging.getLogger(__name__)
@@ -188,10 +189,23 @@ class SemanticRetrievalEngine:
             )
 
             # Step 2: Vector similarity search
+            # If media_type filter is set, pre-filter by type using the type_map
+            media_type_filter: Optional[str] = None
+            if (
+                config.apply_filters
+                and parsed_query.constraints
+                and parsed_query.constraints.media_type
+                and parsed_query.constraints.media_type != MediaType.BOTH
+            ):
+                media_type_filter = (
+                    "tv" if parsed_query.constraints.media_type == MediaType.TV_SHOW else "movie"
+                )
+
             candidates = self._search_similar(
                 query_embedding=query_embedding,
                 top_k=config.top_k,
                 min_similarity=config.min_similarity,
+                media_type_filter=media_type_filter,
             )
 
             if not candidates:
@@ -235,6 +249,7 @@ class SemanticRetrievalEngine:
         query_embedding: Any,
         top_k: int,
         min_similarity: float,
+        media_type_filter: Optional[str] = None,
     ) -> list[tuple[int, float]]:
         """
         Search for similar movies using vector search.
@@ -243,16 +258,33 @@ class SemanticRetrievalEngine:
             query_embedding: Query embedding vector
             top_k: Number of candidates to retrieve
             min_similarity: Minimum similarity threshold
+            media_type_filter: If set ('movie' or 'tv'), only return IDs of that type
 
         Returns:
             List of (movie_id, similarity_score) tuples
         """
         try:
+            # Determine how many to fetch from FAISS
+            # When filtering by media_type, fetch all vectors so we don't miss any of the target type
+            fetch_k = top_k
+            if media_type_filter and self.vector_search._type_map:
+                # Fetch entire index so type-filter has full candidate set
+                fetch_k = self.vector_search.size or top_k
+
             # Perform vector search
             results = self.vector_search.search(
                 query_embedding=query_embedding,
-                k=top_k,
+                k=fetch_k,
             )
+
+            # Pre-filter by media_type using the type_map (before DB enrichment)
+            if media_type_filter and self.vector_search._type_map:
+                allowed_ids = self.vector_search.get_ids_by_media_type(media_type_filter)
+                results = [(mid, score) for mid, score in results if mid in allowed_ids]
+                logger.debug(
+                    f"After media_type pre-filter ({media_type_filter}): "
+                    f"{len(results)} candidates from vector search"
+                )
 
             # Filter by minimum similarity
             if min_similarity > 0:
@@ -261,6 +293,9 @@ class SemanticRetrievalEngine:
                     for movie_id, score in results
                     if score >= min_similarity
                 ]
+
+            # Trim to requested top_k
+            results = results[:top_k]
 
             logger.debug(f"Vector search returned {len(results)} candidates")
             return results
@@ -288,10 +323,12 @@ class SemanticRetrievalEngine:
             # Extract movie IDs
             movie_ids = [movie_id for movie_id, _ in candidates]
 
-            # Create score lookup
-            score_map = {movie_id: score for movie_id, score in candidates}
+            # Create score lookup: convert L2 distance to similarity (higher = more similar)
+            # FAISS HNSW returns L2 distances where lower = more similar
+            # Transform to similarity: 1 / (1 + distance) so higher = better
+            score_map = {movie_id: 1.0 / (1.0 + dist) for movie_id, dist in candidates}
 
-            # Fetch movies from database
+            # Fetch media from database (includes both movies and TV shows)
             movies = self.movie_repo.find_by_ids(movie_ids)
 
             # Enrich with similarity scores
