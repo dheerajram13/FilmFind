@@ -66,6 +66,7 @@ export interface Movie {
 export interface MovieSearchResult extends Movie {
   similarity_score?: number;
   final_score?: number;
+  match_explanation?: string | null;
 }
 
 /**
