@@ -1,25 +1,28 @@
 import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { Bebas_Neue, DM_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
-import { FilterProvider } from "@/lib/filter-context";
 
-const fraunces = Fraunces({
+const displayFont = Bebas_Neue({
   subsets: ["latin"],
+  weight: "400",
   variable: "--font-display",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const manrope = Manrope({
+const bodyFont = DM_Sans({
   subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-body",
+});
+
+const monoFont = DM_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
-  title: "FilmFind - AI-Powered Movie Discovery",
-  description: "Discover movies using natural language and AI-powered semantic search",
+  title: "FilmFind",
+  description: "Cinematic movie discovery experience",
 };
 
 export default function RootLayout({
@@ -28,11 +31,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${fraunces.variable}`}>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <FilterProvider>
-          {children}
-        </FilterProvider>
+    <html lang="en">
+      <body className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
+        {children}
       </body>
     </html>
   );

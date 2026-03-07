@@ -92,6 +92,7 @@ export interface SearchFilters {
   genres?: string[];
   streaming_providers?: string[];
   exclude_adult?: boolean;
+  media_type?: "movie" | "tv_show" | "both";
 }
 
 /**
