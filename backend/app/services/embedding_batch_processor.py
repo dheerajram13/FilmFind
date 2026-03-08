@@ -190,7 +190,7 @@ class EmbeddingBatchProcessor:
 
         # Get total count for progress tracking
         if skip_existing:
-            total_count = self.db.query(Media).filter(Media.embedding_vector.is_(None)).count()
+            total_count = self.db.query(Media).filter(Media.embedding.is_(None)).count()
             logger.info(f"Found {total_count} media items without embeddings")
         else:
             total_count = self.db.query(Media).count()
@@ -211,7 +211,7 @@ class EmbeddingBatchProcessor:
             # Fetch batch of media (both movies and TV shows)
             if skip_existing:
                 media_items = self.db.query(Media).filter(
-                    Media.embedding_vector.is_(None)
+                    Media.embedding.is_(None)
                 ).limit(batch_limit).offset(offset).all()
             else:
                 media_items = self.db.query(Media).limit(batch_limit).offset(offset).all()
@@ -301,16 +301,14 @@ class EmbeddingBatchProcessor:
             movie_id: Media ID
             embedding: 768-dimensional embedding vector
         """
-        # Convert numpy array to list for JSON storage
-        embedding_list = embedding.tolist()
-
-        # Update media with embedding directly (works for both Movie and TVShow)
+        # Update media with pgvector embedding
         media = self.db.query(Media).filter(Media.id == movie_id).first()
         if not media:
             raise ValueError(f"Media with ID {movie_id} not found")
 
-        media.embedding_vector = embedding_list
-        media.embedding_model = self.embedding_service.model_name
+        # Store as Python list — pgvector SQLAlchemy type handles conversion
+        media.embedding = embedding.tolist()
+        media.embedding_needs_rebuild = False
 
     def get_progress(self) -> dict:
         """
@@ -386,25 +384,19 @@ class EmbeddingBatchProcessor:
 
             try:
                 # Validate embedding structure
-                if not isinstance(movie.embedding_vector, list):
+                emb = movie.embedding
+                if emb is None:
                     results["invalid"] += 1
-                    results["errors"].append(f"Movie {movie.id}: embedding_vector is not a list")
+                    results["errors"].append(f"Movie {movie.id}: embedding is NULL")
                     continue
 
-                if len(movie.embedding_vector) != settings.EMBEDDING_DIMENSION:
+                emb_list = list(emb) if not isinstance(emb, list) else emb
+                if len(emb_list) != settings.EMBEDDING_DIMENSION:
                     results["invalid"] += 1
                     results["errors"].append(
                         f"Movie {movie.id}: embedding has "
-                        f"{len(movie.embedding_vector)} dimensions "
+                        f"{len(emb_list)} dimensions "
                         f"(expected {settings.EMBEDDING_DIMENSION})"
-                    )
-                    continue
-
-                # Validate all values are floats
-                if not all(isinstance(x, (int, float)) for x in movie.embedding_vector):
-                    results["invalid"] += 1
-                    results["errors"].append(
-                        f"Movie {movie.id}: embedding contains non-numeric values"
                     )
                     continue
 

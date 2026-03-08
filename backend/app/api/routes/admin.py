@@ -2,10 +2,11 @@
 Admin endpoints — requires Bearer token (ADMIN_SECRET).
 
 Provides:
-- POST /admin/enrich/{film_id}   — run Stage 2 enrichment on a single film
-- POST /admin/embed/{film_id}    — regenerate embedding for a single film
-- GET  /admin/analytics/searches — top queries + CTR from search_sessions
-- GET  /admin/analytics/sixty    — mood/context/craving breakdown from sixty_sessions
+- POST /admin/enrich/{film_id}         — run Stage 2 enrichment on a single film
+- POST /admin/embed/{film_id}          — regenerate embedding for a single film
+- POST /admin/cache/sixty/refresh      — bust and rebuild all 216 sixty-mode cache entries
+- GET  /admin/analytics/searches       — top queries + CTR from search_sessions
+- GET  /admin/analytics/sixty          — mood/context/craving breakdown from sixty_sessions
 """
 from collections import Counter
 from typing import Optional
@@ -16,9 +17,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import DatabaseSession
+from app.core.cache_manager import get_cache_manager
 from app.core.config import settings
+from app.core.scoring import VALID_CONTEXTS, VALID_CRAVINGS, VALID_MOODS
 from app.models.media import Media
 from app.models.session import SearchSession, SixtySession
+from app.services.sixty_scorer import score_films_sql
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -125,17 +129,76 @@ async def regenerate_embedding(film_id: int, db: DatabaseSession) -> dict:
         genre_names = " ".join(g.name for g in (film.genres or []))
         text = f"{film.title} {film.overview or ''} {genre_names}".strip()
         vector = svc.encode(text)
-        film.embedding_vector = vector.tolist() if hasattr(vector, "tolist") else list(vector)
-        film.embedding_model = settings.VECTOR_MODEL
-        film.embedding_dimension = len(film.embedding_vector)
+        film.embedding = vector.tolist() if hasattr(vector, "tolist") else list(vector)
+        film.embedding_needs_rebuild = False
         db.commit()
 
         logger.info(f"Admin regenerated embedding for film {film_id}: {film.title!r}")
-        return {"film_id": film_id, "title": film.title, "dim": film.embedding_dimension, "status": "embedded"}
+        return {"film_id": film_id, "title": film.title, "dim": len(film.embedding), "status": "embedded"}
 
     except Exception as exc:
         logger.error(f"Admin embed failed for film {film_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Cache endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/cache/sixty/refresh",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(_require_admin)],
+)
+async def refresh_sixty_cache(db: DatabaseSession) -> dict:
+    """
+    Bust and rebuild the Redis cache for all 216 mood×context×craving combinations.
+
+    Deletes all existing "sixty:*" keys, then scores each combination via
+    score_films_sql() and stores the top-10 results.  Returns a summary of how
+    many combinations were cached vs skipped (no enriched films).
+
+    This endpoint lets you rebuild stale cache after a score_films.py run
+    without restarting the server.
+    """
+    cache = get_cache_manager()
+
+    # Delete all existing sixty cache entries
+    deleted = cache.delete_pattern("sixty:*")
+    logger.info(f"cache/sixty/refresh: deleted {deleted} existing cache keys")
+
+    cached = 0
+    skipped = 0
+    errors = 0
+
+    for mood in VALID_MOODS:
+        for context in VALID_CONTEXTS:
+            for craving in VALID_CRAVINGS:
+                try:
+                    scored = score_films_sql(db, mood, context, craving)
+                    if scored:
+                        key = f"sixty:{mood}:{context}:{craving}"
+                        payload = [{"id": f.id, "score": s} for f, s in scored]
+                        cache.set(key, payload, ttl=86400)
+                        cached += 1
+                    else:
+                        skipped += 1
+                except Exception as exc:
+                    logger.error(f"cache refresh error {mood}/{context}/{craving}: {exc}")
+                    errors += 1
+
+    logger.info(
+        f"cache/sixty/refresh complete: cached={cached} skipped={skipped} errors={errors}"
+    )
+    return {
+        "status": "ok",
+        "deleted_old_keys": deleted,
+        "combinations_cached": cached,
+        "combinations_skipped_no_films": skipped,
+        "errors": errors,
+        "total_combinations": len(VALID_MOODS) * len(VALID_CONTEXTS) * len(VALID_CRAVINGS),
+    }
 
 
 # ---------------------------------------------------------------------------

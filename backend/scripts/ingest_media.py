@@ -85,6 +85,11 @@ def ingest_movies(max_pages: int = 10):
                         backdrop_path=cleaned.get("backdrop_path"),
                         status=cleaned.get("status"),
                         imdb_id=cleaned.get("imdb_id"),
+                        belongs_to_collection=cleaned.get("belongs_to_collection"),
+                        production_countries=cleaned.get("production_countries") or [],
+                        spoken_languages=cleaned.get("spoken_languages") or [],
+                        origin_country=cleaned.get("origin_country") or [],
+                        production_companies=cleaned.get("production_companies") or [],
                     )
 
                     # Add genres
@@ -197,6 +202,13 @@ def ingest_tv_shows(max_pages: int = 5):
                         first_air_date=cleaned.get("release_date"),
                         last_air_date=tmdb.validator._parse_date(full_data.get("last_air_date")),
                         in_production=full_data.get("in_production", False),
+                        production_countries=cleaned.get("production_countries") or [],
+                        spoken_languages=cleaned.get("spoken_languages") or [],
+                        origin_country=cleaned.get("origin_country") or [],
+                        production_companies=cleaned.get("production_companies") or [],
+                        networks=cleaned.get("networks") or [],
+                        created_by=cleaned.get("created_by") or [],
+                        show_type=cleaned.get("show_type"),
                     )
 
                     # Add genres, keywords, cast (same as movies)

@@ -206,7 +206,7 @@ def get_database_statistics(db: Optional[Session] = None) -> dict[str, Any]:
 
         # Count movies with embeddings
         result = session.execute(
-            text("SELECT COUNT(*) FROM movies WHERE embedding_vector IS NOT NULL")
+            text("SELECT COUNT(*) FROM media WHERE embedding IS NOT NULL")
         )
         stats["movies_with_embeddings"] = result.scalar()
 

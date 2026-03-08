@@ -22,7 +22,7 @@ from app.schemas.query import MediaType, ParsedQuery, QueryConstraints
 from app.services.embedding_service import EmbeddingService
 from app.services.exceptions import FilmFindServiceError, SearchError
 from app.services.query_embedding import QueryEmbeddingService
-from app.services.vector_search import VectorSearchService
+from app.services.pgvector_search import PgVectorSearchService
 from typing import Optional
 
 
@@ -84,7 +84,7 @@ class SemanticRetrievalEngine:
     def __init__(
         self,
         embedding_service: EmbeddingService | None = None,
-        vector_search: VectorSearchService | None = None,
+        vector_search: PgVectorSearchService | None = None,
         movie_repo: MovieRepository | None = None,
     ):
         """
@@ -92,7 +92,7 @@ class SemanticRetrievalEngine:
 
         Args:
             embedding_service: Service for generating embeddings
-            vector_search: Service for vector similarity search
+            vector_search: pgvector search service (injected per-request with DB session)
             movie_repo: Repository for fetching movie metadata
         """
         # Services (with lazy initialization fallback)
@@ -113,16 +113,13 @@ class SemanticRetrievalEngine:
         return self._embedding_service
 
     @property
-    def vector_search(self) -> VectorSearchService:
-        """Lazy-load vector search service."""
+    def vector_search(self) -> PgVectorSearchService:
+        """Get vector search service (must be injected with DB session)."""
         if self._vector_search is None:
-            self._vector_search = VectorSearchService()
-            # Attempt to load existing index
-            try:
-                self._vector_search.load_index()
-                logger.info("Vector index loaded successfully")
-            except Exception as e:
-                logger.warning(f"Could not load vector index: {e}")
+            raise ValueError(
+                "PgVectorSearchService must be injected with a DB session. "
+                "Pass vector_search=PgVectorSearchService(db) when constructing."
+            )
         return self._vector_search
 
     @property
@@ -264,21 +261,17 @@ class SemanticRetrievalEngine:
             List of (movie_id, similarity_score) tuples
         """
         try:
-            # Determine how many to fetch from FAISS
-            # When filtering by media_type, fetch all vectors so we don't miss any of the target type
-            fetch_k = top_k
-            if media_type_filter and self.vector_search._type_map:
-                # Fetch entire index so type-filter has full candidate set
-                fetch_k = self.vector_search.size or top_k
+            # When filtering by media_type, fetch a larger pool first
+            fetch_k = top_k * 3 if media_type_filter else top_k
 
-            # Perform vector search
+            # Perform vector search (pgvector cosine)
             results = self.vector_search.search(
                 query_embedding=query_embedding,
                 k=fetch_k,
             )
 
-            # Pre-filter by media_type using the type_map (before DB enrichment)
-            if media_type_filter and self.vector_search._type_map:
+            # Pre-filter by media_type using pgvector DB lookup
+            if media_type_filter:
                 allowed_ids = self.vector_search.get_ids_by_media_type(media_type_filter)
                 results = [(mid, score) for mid, score in results if mid in allowed_ids]
                 logger.debug(
@@ -323,10 +316,8 @@ class SemanticRetrievalEngine:
             # Extract movie IDs
             movie_ids = [movie_id for movie_id, _ in candidates]
 
-            # Create score lookup: convert L2 distance to similarity (higher = more similar)
-            # FAISS HNSW returns L2 distances where lower = more similar
-            # Transform to similarity: 1 / (1 + distance) so higher = better
-            score_map = {movie_id: 1.0 / (1.0 + dist) for movie_id, dist in candidates}
+            # pgvector returns cosine similarity directly (1 - cosine_distance), range 0-1
+            score_map = {movie_id: score for movie_id, score in candidates}
 
             # Fetch media from database (includes both movies and TV shows)
             movies = self.movie_repo.find_by_ids(movie_ids)

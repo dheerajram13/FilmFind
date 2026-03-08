@@ -3,6 +3,13 @@
 
 POST /sixty/pick   — score all films, pick one, return with why-reasons
 POST /sixty/{session_id}/action — log watch/share/retry clicks
+
+Caching strategy:
+- Cache key: "sixty:{mood}:{context}:{craving}"
+- TTL: 24 hours (86400 seconds)
+- Cached payload: top-10 (film_id, score) pairs
+- At request time, ORM objects are fetched and weighted_random_top3() is called
+  on the cached candidates, so variety is preserved across cached requests.
 """
 import time
 from typing import Optional
@@ -12,18 +19,19 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import DatabaseSession
+from app.core.cache_manager import get_cache_manager
 from app.core.scoring import (
     CONTEXT_MAX_DARKNESS,
     VALID_CONTEXTS,
     VALID_CRAVINGS,
     VALID_MOODS,
     match_score_to_percent,
-    score_film,
     weighted_random_top3,
 )
 from app.db.sessions import log_sixty_session, update_sixty_action
 from app.models.media import Media
 from app.schemas.movie import MovieResponse
+from app.services.sixty_scorer import score_films_sql
 from app.services.sixty_why import generate_why_reasons
 from app.utils.logger import get_logger
 from app.utils.movie_mapper import movie_to_response
@@ -31,6 +39,8 @@ from app.utils.movie_mapper import movie_to_response
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/sixty", tags=["sixty"])
+
+_SIXTY_CACHE_TTL = 86400  # 24 hours
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +71,48 @@ class SixtyActionRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Cache helpers
+# ---------------------------------------------------------------------------
+
+
+def _cache_key(mood: str, context: str, craving: str) -> str:
+    return f"sixty:{mood}:{context}:{craving}"
+
+
+def _load_candidates_from_cache(
+    db: Session, mood: str, context: str, craving: str
+) -> list[tuple[Media, float]] | None:
+    """
+    Return cached (Media, score) pairs, or None on cache miss / disabled.
+    Fetches ORM objects fresh from DB so they're attached to the current session.
+    """
+    cache = get_cache_manager()
+    key = _cache_key(mood, context, craving)
+    cached = cache.get(key)
+    if cached is None:
+        return None
+
+    id_score = {int(item["id"]): float(item["score"]) for item in cached}
+    films = db.query(Media).filter(Media.id.in_(id_score.keys())).all()
+    if not films:
+        return None
+
+    result = [(f, id_score[f.id]) for f in films if f.id in id_score]
+    result.sort(key=lambda x: x[1], reverse=True)
+    return result
+
+
+def _store_candidates_in_cache(
+    mood: str, context: str, craving: str, scored: list[tuple[Media, float]]
+) -> None:
+    """Persist top-10 (film_id, score) pairs to Redis."""
+    cache = get_cache_manager()
+    key = _cache_key(mood, context, craving)
+    payload = [{"id": f.id, "score": s} for f, s in scored]
+    cache.set(key, payload, ttl=_SIXTY_CACHE_TTL)
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -73,15 +125,15 @@ async def sixty_pick(
     """
     Pick one film for 60-second mode.
 
-    Scoring pipeline:
+    Pipeline:
     1. Validate mood/context/craving enum values
-    2. Fetch all films that have mood_scores populated
-    3. Apply CONTEXT_MAX_DARKNESS hard block
-    4. score_film() on each remaining film
-    5. weighted_random_top3() to select
-    6. generate_why_reasons() for 3 bullets
-    7. log_sixty_session() fire-and-forget
-    8. Return film + match_score + why_reasons
+    2. Check Redis cache ("sixty:{mood}:{context}:{craving}", 24h TTL)
+       - Cache hit  → use cached top-10 candidates (no DB scoring needed)
+       - Cache miss → run score_films_sql() in Postgres, cache result
+    3. weighted_random_top3() with Gaussian noise for variety
+    4. generate_why_reasons() for 3 bullets
+    5. log_sixty_session() fire-and-forget
+    6. Return film + match_score + why_reasons
     """
     # Validate enum values
     if request.mood not in VALID_MOODS:
@@ -100,57 +152,35 @@ async def sixty_pick(
             detail=f"Invalid craving '{request.craving}'. Valid values: {sorted(VALID_CRAVINGS)}",
         )
 
-    # Fetch films with mood_scores populated
-    max_darkness = CONTEXT_MAX_DARKNESS.get(request.context, 10)
+    # Try cache first
+    scored = _load_candidates_from_cache(db, request.mood, request.context, request.craving)
+    cache_hit = scored is not None
 
-    films = (
-        db.query(Media)
-        .filter(
-            Media.mood_scores.isnot(None),
-            Media.adult == False,  # noqa: E712
-        )
-        .all()
-    )
+    if not scored:
+        # Run SQL scoring — returns top-10 fully-enriched, darkness-filtered films
+        scored = score_films_sql(db, request.mood, request.context, request.craving)
 
-    if not films:
-        # Fall back to all films if none are enriched yet
-        films = (
-            db.query(Media)
-            .filter(Media.adult == False)  # noqa: E712
-            .all()
-        )
+        if scored:
+            _store_candidates_in_cache(request.mood, request.context, request.craving, scored)
 
-    if not films:
+    if not scored:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No films available. Database may be empty.",
+            detail=(
+                "No fully-scored films available for this combination. "
+                "Run score_films.py to enrich the database."
+            ),
         )
 
-    logger.info(f"sixty_pick: {len(films)} candidate films, context={request.context}")
+    logger.info(
+        f"sixty_pick: {len(scored)} candidates "
+        f"({'cache hit' if cache_hit else 'cache miss'}) "
+        f"mood={request.mood} context={request.context} craving={request.craving}"
+    )
 
-    # Score each film (darkness filter is applied inside score_film)
-    scored: list[tuple[Media, float]] = []
-    for film in films:
-        raw_score = score_film(film, request.mood, request.context, request.craving)
-        if raw_score > 0.0:
-            scored.append((film, raw_score))
-
-    if not scored:
-        # If enrichment scores block everything (e.g. strict family filter),
-        # fall back to darkness-only filter on all films
-        for film in films:
-            film_darkness = getattr(film, "darkness_score", None) or 5
-            if film_darkness <= max_darkness:
-                scored.append((film, 0.5))
-
-    if not scored:
-        # Last resort — return any film
-        scored = [(films[0], 0.5)]
-
-    # Weighted random pick from top 3
+    # Weighted random pick from top 3 (with noise for variety)
     selected_film: Media = weighted_random_top3(scored)
     best_score = next(s for f, s in scored if f.id == selected_film.id)
-
     match_score = match_score_to_percent(best_score)
 
     # Generate personalised why-reasons

@@ -62,6 +62,11 @@ class TMDBDataValidator:
             "imdb_id": movie_data.get("imdb_id"),
             "genres": [g["name"] for g in movie_data.get("genres", [])],
             "genre_ids": [g["id"] for g in movie_data.get("genres", [])],
+            "belongs_to_collection": movie_data.get("belongs_to_collection"),
+            "production_countries": [c["iso_3166_1"] for c in movie_data.get("production_countries", [])],
+            "spoken_languages": [l["iso_639_1"] for l in movie_data.get("spoken_languages", [])],
+            "origin_country": movie_data.get("origin_country", []),
+            "production_companies": movie_data.get("production_companies", []),
         }
 
         # Extract keywords if available
@@ -75,7 +80,7 @@ class TMDBDataValidator:
         if "credits" in movie_data:
             cleaned["cast"] = [
                 {
-                    "id": cast["id"],
+                    "tmdb_id": cast["id"],
                     "name": cast["name"],
                     "character": cast.get("character", ""),
                     "order": cast.get("order", 999),
@@ -136,6 +141,14 @@ class TMDBDataValidator:
             "imdb_id": tv_data.get("external_ids", {}).get("imdb_id") if "external_ids" in tv_data else None,
             "genres": [g["name"] for g in tv_data.get("genres", [])],
             "genre_ids": [g["id"] for g in tv_data.get("genres", [])],
+            "belongs_to_collection": None,  # TV shows don't have collections
+            "production_countries": [c["iso_3166_1"] for c in tv_data.get("production_countries", [])],
+            "spoken_languages": [l["iso_639_1"] for l in tv_data.get("spoken_languages", [])],
+            "origin_country": tv_data.get("origin_country", []),
+            "production_companies": tv_data.get("production_companies", []),
+            "networks": tv_data.get("networks", []),
+            "created_by": tv_data.get("created_by", []),
+            "show_type": tv_data.get("type"),
         }
 
         # Extract keywords if available (TV uses 'results' instead of 'keywords')

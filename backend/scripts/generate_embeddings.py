@@ -102,14 +102,16 @@ def generate_embeddings(args):
         from app.models.media import Media, Movie, TVShow
         from sqlalchemy import func
 
-        movies_total = db.query(func.count(Movie.id)).scalar()
-        movies_with_emb = db.query(func.count(Movie.id)).filter(Movie.embedding_vector.isnot(None)).scalar()
-        tv_total = db.query(func.count(TVShow.id)).scalar()
-        tv_with_emb = db.query(func.count(TVShow.id)).filter(TVShow.embedding_vector.isnot(None)).scalar()
+        movies_total = db.query(func.count(Movie.id)).scalar() or 0
+        movies_with_emb = db.query(func.count(Movie.id)).filter(Movie.embedding.isnot(None)).scalar() or 0
+        tv_total = db.query(func.count(TVShow.id)).scalar() or 0
+        tv_with_emb = db.query(func.count(TVShow.id)).filter(TVShow.embedding.isnot(None)).scalar() or 0
 
         logger.info("Media type breakdown:")
-        logger.info(f"  Movies: {movies_with_emb}/{movies_total} ({movies_with_emb/movies_total*100:.1f}%)")
-        logger.info(f"  TV Shows: {tv_with_emb}/{tv_total} ({tv_with_emb/tv_total*100:.1f}%)")
+        if movies_total:
+            logger.info(f"  Movies: {movies_with_emb}/{movies_total} ({movies_with_emb/movies_total*100:.1f}%)")
+        if tv_total:
+            logger.info(f"  TV Shows: {tv_with_emb}/{tv_total} ({tv_with_emb/tv_total*100:.1f}%)")
 
     except KeyboardInterrupt:
         logger.warning("Process interrupted by user")

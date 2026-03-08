@@ -83,7 +83,11 @@ def get_query_parser() -> QueryParser:
 def get_retrieval_engine(db: DatabaseSession) -> SemanticRetrievalEngine:
     """Dependency for semantic retrieval engine."""
     from app.repositories.movie_repository import MovieRepository
-    return SemanticRetrievalEngine(movie_repo=MovieRepository(db))
+    from app.services.pgvector_search import PgVectorSearchService
+    return SemanticRetrievalEngine(
+        movie_repo=MovieRepository(db),
+        vector_search=PgVectorSearchService(db),
+    )
 
 
 def get_scoring_engine() -> MultiSignalScoringEngine:

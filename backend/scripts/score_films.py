@@ -124,6 +124,7 @@ def score_batch(batch_size: int, offset: int = 0) -> None:
                 film.mood_scores = data.get("mood_scores") or {}
                 film.context_scores = data.get("context_scores") or {}
                 film.craving_scores = data.get("craving_scores") or {}
+                film.is_fully_scored = True
 
                 db.commit()
                 scored += 1

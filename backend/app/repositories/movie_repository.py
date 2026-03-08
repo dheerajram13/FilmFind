@@ -368,7 +368,7 @@ class MovieRepository(BaseRepository[Movie]):
                 selectinload(Movie.keywords),
                 selectinload(Movie.cast_members),
             )
-            .filter(Movie.embedding_vector.is_(None))
+            .filter(Movie.embedding.is_(None))
             .order_by(desc(Movie.popularity))  # Prioritize popular movies
             .offset(offset)
             .limit(limit)
@@ -392,7 +392,7 @@ class MovieRepository(BaseRepository[Movie]):
         """
         return (
             self.db.query(Movie)
-            .filter(Movie.embedding_vector.isnot(None))
+            .filter(Movie.embedding.isnot(None))
             .offset(skip)
             .limit(limit)
             .all()
@@ -405,7 +405,7 @@ class MovieRepository(BaseRepository[Movie]):
         Returns:
             Number of movies with embeddings
         """
-        return self.db.query(Movie).filter(Movie.embedding_vector.isnot(None)).count()
+        return self.db.query(Movie).filter(Movie.embedding.isnot(None)).count()
 
     def count_movies_without_embeddings(self) -> int:
         """
@@ -414,7 +414,7 @@ class MovieRepository(BaseRepository[Movie]):
         Returns:
             Number of movies without embeddings
         """
-        return self.db.query(Movie).filter(Movie.embedding_vector.is_(None)).count()
+        return self.db.query(Movie).filter(Movie.embedding.is_(None)).count()
 
     def update_embedding(
         self,
@@ -437,9 +437,8 @@ class MovieRepository(BaseRepository[Movie]):
         if not movie:
             raise ValueError(f"Movie with ID {movie_id} not found")
 
-        movie.embedding_vector = embedding
-        movie.embedding_model = model_name
-        movie.embedding_dimension = len(embedding)
+        movie.embedding = embedding
+        movie.embedding_needs_rebuild = False
         self.db.flush()  # Flush to detect errors without committing
 
     # =============================================================================
