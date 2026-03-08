@@ -12,6 +12,9 @@ import {
   SearchFilters,
   SearchResponse,
   SimilarMoviesResponse,
+  SixtyActionRequest,
+  SixtyPickRequest,
+  SixtyPickResponse,
   TrendingMoviesResponse,
 } from "@/types/api";
 
@@ -159,6 +162,29 @@ export const apiClient = {
   healthCheck: async (): Promise<HealthCheckResponse> => {
     return fetchAPI<HealthCheckResponse>("/health", {
       method: "GET",
+    });
+  },
+
+  /**
+   * 60-Second Mode: pick a film based on mood/context/craving
+   */
+  sixtyPick: async (request: SixtyPickRequest): Promise<SixtyPickResponse> => {
+    return fetchAPI<SixtyPickResponse>("/sixty/pick", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  },
+
+  /**
+   * 60-Second Mode: log a watch/share/retry action
+   */
+  sixtyAction: async (
+    sessionId: string,
+    request: SixtyActionRequest
+  ): Promise<void> => {
+    await fetchAPI<void>(`/sixty/${sessionId}/action`, {
+      method: "POST",
+      body: JSON.stringify(request),
     });
   },
 };

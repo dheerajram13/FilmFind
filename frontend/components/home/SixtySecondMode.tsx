@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "@/lib/api-client";
 import { getBackdropUrl, getPlaceholderImage, getPosterUrl } from "@/lib/image-utils";
-import { MovieSearchResult } from "@/types/api";
+import { Movie, SixtyContext, SixtyMood, SixtyyCraving } from "@/types/api";
 
 type Screen = "q1" | "q2" | "q3" | "analysing" | "result";
 
@@ -193,7 +193,7 @@ const ANALYSIS_STEPS = [
   { icon: "✨", text: "Locking in your pick" },
 ];
 
-const FALLBACK_RESULT: MovieSearchResult = {
+const FALLBACK_RESULT: Movie = {
   id: -1,
   tmdb_id: -1,
   media_type: "movie",
@@ -216,9 +216,6 @@ const FALLBACK_RESULT: MovieSearchResult = {
   original_language: "en",
   tagline: null,
   streaming_providers: null,
-  final_score: 0.95,
-  match_explanation:
-    "High-intensity rhythm and emotional pressure align strongly with your selected energy and desired payoff.",
 };
 
 const CONTEXT_FALLBACK = CONTEXT_OPTIONS[0];
@@ -249,14 +246,7 @@ function runtimeLabel(runtime: number | null): string | null {
   return `${runtime} min`;
 }
 
-function scoreAsPercent(movie: MovieSearchResult): number {
-  const score = movie.final_score ?? movie.similarity_score ?? 0;
-  if (!Number.isFinite(score)) return 94;
-  if (score > 1) return Math.min(99, Math.max(87, Math.round(score)));
-  return Math.min(99, Math.max(87, Math.round(score * 100)));
-}
-
-function genreEmoji(movie: MovieSearchResult): string {
+function genreEmoji(movie: Movie): string {
   const firstGenre = movie.genres[0]?.name.toLowerCase() ?? "";
   if (firstGenre.includes("drama")) return "🎭";
   if (firstGenre.includes("thriller")) return "🔍";
@@ -290,7 +280,7 @@ function collectProviderNames(value: unknown, sink: Set<string>) {
   Object.values(objectValue).forEach((entry) => collectProviderNames(entry, sink));
 }
 
-function primaryProvider(movie: MovieSearchResult): string {
+function primaryProvider(movie: Movie): string {
   if (!movie.streaming_providers || typeof movie.streaming_providers !== "object") return "Netflix";
   const names = new Set<string>();
   collectProviderNames(movie.streaming_providers, names);
@@ -306,6 +296,54 @@ function formatCravingLabel(key: string): string {
   return optionFor(CRAVING_OPTIONS, key, CRAVING_FALLBACK).label.replace(/"/g, "");
 }
 
+// Map frontend option keys to backend enum values
+const MOOD_KEY_MAP: Record<string, SixtyMood> = {
+  happy: "happy",
+  sad: "sad",
+  charged: "charged",
+  chill: "chill",
+  adventurous: "adventurous",
+  romantic: "romantic",
+  // frontend-only keys → closest backend value
+  drained: "chill",
+  bored: "adventurous",
+  curious: "charged",
+};
+
+const CONTEXT_KEY_MAP: Record<string, SixtyContext> = {
+  "solo-night": "solo-night",
+  "solo-day": "background",
+  partner: "date-night",
+  friends: "friends",
+  family: "family",
+  date: "date-night",
+  "movie-night": "movie-night",
+  background: "background",
+};
+
+const CRAVING_KEY_MAP: Record<string, SixtyyCraving> = {
+  "mind-blown": "mind-blown",
+  cry: "cry",
+  pumped: "thrilled",
+  laugh: "laugh",
+  inspired: "inspired",
+  cosy: "comforted",
+  thrilled: "thrilled",
+  scared: "scared",
+  comforted: "comforted",
+  wowed: "wowed",
+};
+
+function toBackendMood(key: string): SixtyMood {
+  return MOOD_KEY_MAP[key] ?? "happy";
+}
+function toBackendContext(key: string): SixtyContext {
+  return CONTEXT_KEY_MAP[key] ?? "solo-night";
+}
+function toBackendCraving(key: string): SixtyyCraving {
+  return CRAVING_KEY_MAP[key] ?? "inspired";
+}
+
 function buildModeQuery(moodKey: string, contextKey: string, cravingKey: string): string {
   const mood = optionFor(MOOD_OPTIONS, moodKey, MOOD_FALLBACK);
   const context = optionFor(CONTEXT_OPTIONS, contextKey, CONTEXT_FALLBACK);
@@ -313,24 +351,56 @@ function buildModeQuery(moodKey: string, contextKey: string, cravingKey: string)
   return `${mood.searchPrompt}, ${context.searchPrompt}, ${craving.searchPrompt}`;
 }
 
-async function resolveMovie(query: string): Promise<MovieSearchResult> {
-  try {
-    const response = await apiClient.search(query, undefined, 12);
-    if (response.results.length > 0) return response.results[0];
-    return FALLBACK_RESULT;
-  } catch {
-    return FALLBACK_RESULT;
-  }
-}
+type SixtyPickResult = { movie: Movie; matchScore: number; whyReasons: string[]; sessionId: string };
 
-function buildWhy(
-  movie: MovieSearchResult,
-  mood: ModeOption,
-  context: ModeOption,
-  craving: ModeOption
-): string[] {
-  const first = movie.match_explanation?.trim().length ? movie.match_explanation : mood.why;
-  return [first, context.why, craving.why].slice(0, 3);
+async function resolveMovieSixtyPick(
+  moodKey: string,
+  contextKey: string,
+  cravingKey: string,
+  sessionToken: string,
+  secondsTaken: number,
+): Promise<SixtyPickResult> {
+  try {
+    const response = await apiClient.sixtyPick({
+      mood: toBackendMood(moodKey),
+      context: toBackendContext(contextKey),
+      craving: toBackendCraving(cravingKey),
+      session_token: sessionToken,
+      seconds_taken: secondsTaken,
+    });
+    return {
+      movie: response.film,
+      matchScore: response.match_score,
+      whyReasons: response.why_reasons,
+      sessionId: response.session_id,
+    };
+  } catch {
+    // Fall back to text search if the endpoint fails
+    const query = buildModeQuery(moodKey, contextKey, cravingKey);
+    try {
+      const searchResponse = await apiClient.search(query, undefined, 12);
+      const film = searchResponse.results[0] as unknown as Movie | undefined;
+      if (film) {
+        const mood = optionFor(MOOD_OPTIONS, moodKey, MOOD_FALLBACK);
+        const context = optionFor(CONTEXT_OPTIONS, contextKey, CONTEXT_FALLBACK);
+        const craving = optionFor(CRAVING_OPTIONS, cravingKey, CRAVING_FALLBACK);
+        return {
+          movie: film,
+          matchScore: 94,
+          whyReasons: [mood.why, context.why, craving.why],
+          sessionId: "",
+        };
+      }
+    } catch {
+      // ignore nested error
+    }
+    return {
+      movie: FALLBACK_RESULT,
+      matchScore: 94,
+      whyReasons: [MOOD_FALLBACK.why, CONTEXT_FALLBACK.why, CRAVING_FALLBACK.why],
+      sessionId: "",
+    };
+  }
 }
 
 export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondModeProps) {
@@ -342,11 +412,12 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
   const [selectedCraving, setSelectedCraving] = useState<string | null>(null);
   const [analysisCountdown, setAnalysisCountdown] = useState(3);
   const [analysisVisibleSteps, setAnalysisVisibleSteps] = useState(0);
-  const [resultMovie, setResultMovie] = useState<MovieSearchResult | null>(null);
+  const [resultMovie, setResultMovie] = useState<Movie | null>(null);
   const [resultMatch, setResultMatch] = useState(95);
   const [resultQuery, setResultQuery] = useState("");
   const [resultWhy, setResultWhy] = useState<string[]>([]);
   const [resultElapsed, setResultElapsed] = useState<number | null>(null);
+  const [resultSessionId, setResultSessionId] = useState<string>("");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -382,6 +453,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
     setResultQuery("");
     setResultWhy([]);
     setResultElapsed(null);
+    setResultSessionId("");
     setIsTransitioning(false);
     setShareOpen(false);
   }, [clearScheduledWork]);
@@ -453,7 +525,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
       getPlaceholderImage()
     : getPlaceholderImage();
 
-  const resolvedMovie = resultMovie ?? FALLBACK_RESULT;
+  const resolvedMovie: Movie = resultMovie ?? FALLBACK_RESULT;
 
   const runAnalysis = useCallback((moodKey: string, contextKey: string, cravingKey: string) => {
     const flowRunId = runIdRef.current + 1;
@@ -470,7 +542,8 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
     const query = buildModeQuery(moodKey, contextKey, cravingKey);
     setResultQuery(query);
 
-    const resultPromise = resolveMovie(query);
+    const sessionToken = `ff-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const resultPromise = resolveMovieSixtyPick(moodKey, contextKey, cravingKey, sessionToken, elapsed);
 
     ANALYSIS_STEPS.forEach((_, index) => {
       queueTimeout(() => {
@@ -485,17 +558,14 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
 
     queueTimeout(async () => {
       if (runIdRef.current !== flowRunId) return;
-      const movie = await resultPromise;
+      const { movie, matchScore, whyReasons, sessionId } = await resultPromise;
       if (runIdRef.current !== flowRunId) return;
 
-      const mood = optionFor(MOOD_OPTIONS, moodKey, MOOD_FALLBACK);
-      const context = optionFor(CONTEXT_OPTIONS, contextKey, CONTEXT_FALLBACK);
-      const craving = optionFor(CRAVING_OPTIONS, cravingKey, CRAVING_FALLBACK);
-
       setResultMovie(movie);
-      setResultMatch(scoreAsPercent(movie));
+      setResultMatch(matchScore);
       setResultElapsed(elapsed);
-      setResultWhy(buildWhy(movie, mood, context, craving));
+      setResultWhy(whyReasons);
+      setResultSessionId(sessionId);
       setScreen("result");
     }, 3000);
   }, [queueTimeout, timerSeconds]);
@@ -783,13 +853,22 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                   </div>
 
                   <div className="ff60-result-actions">
-                    <button type="button" className="ff60-btn-watch" onClick={() => onApplyQuery(resultQuery)}>
+                    <button type="button" className="ff60-btn-watch" onClick={() => {
+                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { watch_clicked: true }).catch(() => {});
+                      onApplyQuery(resultQuery);
+                    }}>
                       ▶ Watch on {watchProvider}
                     </button>
-                    <button type="button" className="ff60-btn-share" onClick={() => setShareOpen(true)}>
+                    <button type="button" className="ff60-btn-share" onClick={() => {
+                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { share_clicked: true }).catch(() => {});
+                      setShareOpen(true);
+                    }}>
                       ↗ Share
                     </button>
-                    <button type="button" className="ff60-btn-retry" onClick={resetFlow}>
+                    <button type="button" className="ff60-btn-retry" onClick={() => {
+                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { retry_clicked: true }).catch(() => {});
+                      resetFlow();
+                    }}>
                       Try again
                     </button>
                   </div>

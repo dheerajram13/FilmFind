@@ -9,7 +9,10 @@ Provides endpoints for:
 - Trending movies
 """
 
+import time
+
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 
 from app.api.cache_dependencies import (
     get_filter_cache,
@@ -55,6 +58,7 @@ from app.utils.movie_repository import (
 from app.utils.movie_repository import (
     get_trending_movies as fetch_trending_movies,
 )
+from app.db.sessions import log_search_session, update_search_click
 from app.utils.query_interpretation import (
     build_empty_query_interpretation,
     build_query_interpretation,
@@ -147,6 +151,7 @@ async def search_movies(
         ValidationException: If query or filters are invalid
     """
     logger.info(f"Search request: {request.query}")
+    _start_ms = int(time.time() * 1000)
 
     # Validate query
     if not request.query or len(request.query.strip()) < MIN_QUERY_LENGTH:
@@ -270,6 +275,21 @@ async def search_movies(
 
     # Cache the response
     cache.set(request.query, response.dict(), filters_dict, request.limit)
+
+    # Fire-and-forget session logging
+    _response_ms = int(time.time() * 1000) - _start_ms
+    _session_token = getattr(request, "session_token", "") or ""
+    try:
+        log_search_session(
+            db=db,
+            query_text=request.query,
+            query_parsed=query_intent.dict() if query_intent else {},
+            results=[r.dict() for r in results[:10]],
+            session_token=_session_token,
+            response_ms=_response_ms,
+        )
+    except Exception:
+        pass  # never block the response
 
     return response
 
@@ -529,6 +549,25 @@ async def get_trending_movies(
 
 
 # =============================================================================
+# Session Click Endpoint
+# =============================================================================
+
+
+class SearchClickRequest(BaseModel):
+    film_id: int
+
+
+@router.post("/search/{session_id}/click", status_code=status.HTTP_204_NO_CONTENT)
+async def record_search_click(
+    session_id: str,
+    request: SearchClickRequest,
+    db: DatabaseSession,
+) -> None:
+    """Record which search result was clicked."""
+    await update_search_click(db=db, session_id=session_id, film_id=request.film_id)
+
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
@@ -543,7 +582,16 @@ def _convert_filters_to_constraints(filters: SearchFilters) -> QueryConstraints:
     Returns:
         QueryConstraints schema
     """
+    from app.schemas.query import MediaType as _MediaType
+    media_type = _MediaType.BOTH
+    if filters.media_type is not None:
+        try:
+            media_type = _MediaType(filters.media_type)
+        except ValueError:
+            media_type = _MediaType.BOTH
+
     return QueryConstraints(
+        media_type=media_type,
         year_min=filters.year_min,
         year_max=filters.year_max,
         rating_min=filters.rating_min,
@@ -599,5 +647,11 @@ def _merge_constraints(parsed_query: ParsedQuery, filters: SearchFilters | None)
         merged_constraints.adult_content = not filters.exclude_adult
     if filters.streaming_providers:
         merged_constraints.streaming_providers = filters.streaming_providers
+    if filters.media_type is not None:
+        from app.schemas.query import MediaType as _MediaType
+        try:
+            merged_constraints.media_type = _MediaType(filters.media_type)
+        except ValueError:
+            pass  # ignore invalid values, keep LLM-parsed media_type
 
     return merged_constraints

@@ -66,6 +66,7 @@ export interface Movie {
 export interface MovieSearchResult extends Movie {
   similarity_score?: number;
   final_score?: number;
+  relevance_score?: number;
   match_explanation?: string | null;
 }
 
@@ -161,6 +162,35 @@ export interface HealthCheckResponse {
   status: string;
   timestamp: string;
   version: string;
+}
+
+/**
+ * 60-Second Mode types
+ */
+export type SixtyMood = "happy" | "sad" | "charged" | "chill" | "adventurous" | "romantic";
+export type SixtyContext = "family" | "date-night" | "solo-night" | "friends" | "movie-night" | "background";
+export type SixtyyCraving = "laugh" | "cry" | "mind-blown" | "thrilled" | "inspired" | "scared" | "comforted" | "wowed";
+
+export interface SixtyPickRequest {
+  mood: SixtyMood;
+  context: SixtyContext;
+  craving: SixtyyCraving;
+  session_token?: string;
+  region?: string;
+  seconds_taken?: number;
+}
+
+export interface SixtyPickResponse {
+  film: Movie;
+  match_score: number;
+  why_reasons: string[];
+  session_id: string;
+}
+
+export interface SixtyActionRequest {
+  watch_clicked?: boolean;
+  share_clicked?: boolean;
+  retry_clicked?: boolean;
 }
 
 /**

@@ -24,14 +24,46 @@ const TRENDING_SEARCHES = [
 ];
 
 const NAV_ITEMS = ["How it works", "Watchlist"];
-const STREAMING_OPTIONS = ["Netflix", "Prime Video", "HBO Max", "Hulu", "Apple TV+"];
-const GENRE_OPTIONS = ["Thriller", "Drama", "Crime", "Mystery"];
+const STREAMING_OPTIONS = [
+  "Netflix",
+  "Prime Video",
+  "Disney+",
+  "HBO Max",
+  "Apple TV+",
+  "Stan",
+  "Paramount+",
+  "Hulu",
+  "Crunchyroll",
+  "BINGE",
+];
+const GENRE_OPTIONS = [
+  "Action",
+  "Adventure",
+  "Animation",
+  "Comedy",
+  "Crime",
+  "Documentary",
+  "Drama",
+  "Fantasy",
+  "Horror",
+  "Mystery",
+  "Romance",
+  "Science Fiction",
+  "Thriller",
+  "War",
+  "Western",
+];
 const STREAM_ICON_MAP: Record<string, string> = {
   netflix: "📺",
   "prime video": "🎬",
+  "disney+": "✨",
   "hbo max": "🎞️",
-  hulu: "🎥",
   "apple tv+": "🍎",
+  stan: "🎭",
+  "paramount+": "⛰️",
+  hulu: "🎥",
+  crunchyroll: "🍊",
+  binge: "📡",
 };
 
 type ScreenView = "home" | "results" | "detail";
@@ -51,6 +83,12 @@ function normalizeProviderName(provider: string): string {
   if (lower.includes("prime")) return "prime video";
   if (lower.includes("hbo") || lower === "max") return "hbo max";
   if (lower.includes("apple")) return "apple tv+";
+  if (lower.includes("disney")) return "disney+";
+  if (lower.includes("paramount")) return "paramount+";
+  if (lower.includes("crunchyroll")) return "crunchyroll";
+  if (lower.includes("binge")) return "binge";
+  if (lower.includes("stan")) return "stan";
+  if (lower.includes("foxtel")) return "binge";
   return lower;
 }
 
@@ -91,10 +129,12 @@ function getProviderNames(movie: MovieSearchResult): string[] {
 }
 
 function scoreAsPercent(movie: MovieSearchResult): number {
-  const score = movie.final_score ?? movie.similarity_score ?? 0;
-  if (!Number.isFinite(score)) return 0;
-  if (score > 1) return Math.min(Math.round(score), 100);
-  return Math.round(score * 100);
+  // relevance_score = multi-signal final score (best signal)
+  // similarity_score = raw semantic cosine similarity (fallback)
+  const score = movie.relevance_score ?? movie.similarity_score ?? 0;
+  if (!Number.isFinite(score) || score <= 0) return 0;
+  // Both scores are 0–1; clamp to 99 max so it never shows 100%
+  return Math.min(Math.round(score * 100), 99);
 }
 
 function primaryGenre(movie: MovieSearchResult): string {
@@ -282,10 +322,10 @@ export function FilmfindHome() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedStreaming, setSelectedStreaming] = useState<string[]>(["Netflix", "Prime Video"]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>(["Thriller", "Drama"]);
+  const [selectedStreaming, setSelectedStreaming] = useState<string[]>(STREAMING_OPTIONS);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(GENRE_OPTIONS);
   const [minRating, setMinRating] = useState(7.0);
-  const [minYear, setMinYear] = useState(2005);
+  const [minYear, setMinYear] = useState(1980);
   const [sixtyModeOpen, setSixtyModeOpen] = useState(false);
 
   const filteredResults = useMemo(() => {
@@ -353,10 +393,10 @@ export function FilmfindHome() {
   };
 
   const clearFilters = () => {
-    setSelectedStreaming(["Netflix", "Prime Video"]);
-    setSelectedGenres(["Thriller", "Drama"]);
+    setSelectedStreaming(STREAMING_OPTIONS);
+    setSelectedGenres(GENRE_OPTIONS);
     setMinRating(7);
-    setMinYear(2005);
+    setMinYear(1980);
   };
 
   const resetToHome = () => {

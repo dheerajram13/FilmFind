@@ -93,9 +93,16 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: ClassVar[list] = [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://frontend.filmfind.orb.local",
+        "https://frontend.filmfind.orb.local",
         "http://localhost:8000",
         "https://filmfind.com",
     ]
+
+    # Admin
+    ADMIN_SECRET: str = Field(default="", description="Bearer token for admin endpoints")
+    DEFAULT_REGION: str = Field(default="AU", description="Default region for streaming availability")
 
     # Security
     SECRET_KEY: str = Field(

@@ -21,6 +21,7 @@ class SearchFilters(BaseModel):
     genres: Optional[list[str]] = Field(None, description="List of genre names")
     streaming_providers: Optional[list[str]] = Field(None, description="Streaming service names")
     exclude_adult: bool = Field(True, description="Exclude adult content")
+    media_type: Optional[str] = Field(None, description="Media type filter: 'movie', 'tv_show', or 'both'")
 
 
 class SearchRequest(BaseModel):
@@ -29,6 +30,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., description="Natural language search query")
     limit: int = Field(10, ge=1, le=50, description="Number of results to return")
     filters: Optional[SearchFilters] = None
+    session_token: Optional[str] = Field(None, description="Client session token for analytics")
 
 
 class QueryInterpretation(BaseModel):

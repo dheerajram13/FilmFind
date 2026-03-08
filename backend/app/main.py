@@ -15,7 +15,7 @@ from app.api.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.api.routes import health, search
+from app.api.routes import admin, health, search, sixty
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, stop_scheduler
 from app.utils.logger import get_logger
@@ -132,6 +132,12 @@ app.include_router(health.router)
 
 # Search and recommendation routes
 app.include_router(search.router)
+
+# 60-Second Mode routes
+app.include_router(sixty.router, prefix="/api")
+
+# Admin routes
+app.include_router(admin.router, prefix="/api")
 
 # =============================================================================
 # Application Entry Point
