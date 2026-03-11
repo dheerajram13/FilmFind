@@ -13,6 +13,7 @@ const SAMPLE_CHIPS = [
   '"Slow burn thriller like Parasite"',
   '"Feel-good like Ted Lasso"',
   '"Mind-bending like Inception"',
+  '"Something to cry to"',
 ];
 
 const TRENDING_SEARCHES = [
@@ -23,7 +24,7 @@ const TRENDING_SEARCHES = [
   "Like The Bear but a movie",
 ];
 
-const NAV_ITEMS = ["How it works", "Watchlist"];
+const CONTENT_TYPE_OPTIONS = ["Movies", "Series", "Documentaries"];
 const STREAMING_OPTIONS = [
   "Netflix",
   "Prime Video",
@@ -243,13 +244,19 @@ function detailStreamingOptions(
 
 function ResultCard({
   movie,
+  rank,
   query,
   selectedStreaming,
+  expandedId,
+  onToggleExpand,
   onOpenDetails,
 }: {
   movie: MovieSearchResult;
+  rank: number;
   query: string;
   selectedStreaming: string[];
+  expandedId: number | null;
+  onToggleExpand: (id: number) => void;
   onOpenDetails: (movie: MovieSearchResult) => void;
 }) {
   const year = parseYear(movie.release_date);
@@ -258,6 +265,10 @@ function ResultCard({
   const match = scoreAsPercent(movie);
   const watchLabel = pickWatchLabel(movie, selectedStreaming);
   const reasons = buildReasons(movie, query);
+  const runtime = runtimeLabel(movie.runtime);
+  const isExpanded = expandedId === movie.id;
+  const rankOpacity = Math.max(0.62, 1 - (rank - 1) * 0.08);
+  const similarityPct = Math.round((movie.similarity_score ?? 0) * 100);
 
   const imageUrl =
     getBackdropUrl(movie.backdrop_path, "w780") ||
@@ -265,7 +276,10 @@ function ResultCard({
     getPlaceholderImage();
 
   return (
-    <article className="ff-r-card">
+    <article
+      className={`ff-r-card${isExpanded ? " expanded" : ""}`}
+      style={{ opacity: rankOpacity }}
+    >
       <div className="ff-r-poster">
         <Image
           src={imageUrl}
@@ -274,28 +288,36 @@ function ResultCard({
           sizes="(max-width: 900px) 100vw, 33vw"
           className="ff-r-poster-image"
         />
-        <div className="ff-r-match">★ {match}% match</div>
+        <div className="ff-r-poster-grad" />
+        <div className="ff-r-rank-badge">{rank}</div>
+        <div className="ff-r-match-badge">
+          <span className="ff-badge-star">★</span>
+          <span className="ff-badge-pct">{match}%</span>
+        </div>
       </div>
 
       <div className="ff-r-body">
-        <div className="ff-r-top">
-          <h3 className="ff-r-title">{movie.title}</h3>
-          <button type="button" className="ff-r-save" aria-label={`Save ${movie.title}`}>
-            ♡
-          </button>
-        </div>
+        <h3 className="ff-r-title">{movie.title}</h3>
 
         <div className="ff-r-meta">
           <span className="ff-r-rating">★ {rating.toFixed(1)}</span>
+          <span className="ff-r-dot" />
           <span>{year ?? "TBA"}</span>
+          <span className="ff-r-dot" />
           <span>{genre}</span>
+          {runtime && (
+            <>
+              <span className="ff-r-dot" />
+              <span>{runtime}</span>
+            </>
+          )}
         </div>
 
         <div className="ff-r-reasons">
           {reasons.map((reason) => (
             <div className="ff-r-reason" key={`${movie.id}-${reason}`}>
-              <span className="ff-r-dot" />
-              <span>{reason}</span>
+              <div className="ff-reason-dot" />
+              <span className="ff-reason-text">{reason}</span>
             </div>
           ))}
         </div>
@@ -304,10 +326,50 @@ function ResultCard({
           <button type="button" className="ff-r-watch">
             ▶ {watchLabel}
           </button>
-          <button type="button" className="ff-r-more" onClick={() => onOpenDetails(movie)}>
+          <button
+            type="button"
+            className="ff-r-more"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails(movie);
+            }}
+          >
             Details
           </button>
         </div>
+      </div>
+
+      <button
+        type="button"
+        className="ff-r-expand"
+        onClick={() => onToggleExpand(movie.id)}
+      >
+        {isExpanded ? "▴ hide breakdown" : "▾ score breakdown"}
+      </button>
+
+      <div className="ff-r-breakdown">
+        <div className="ff-breakdown-title">Score breakdown</div>
+        <div className="ff-score-bars">
+          <div className="ff-score-row">
+            <span className="ff-score-lbl">Narrative fit</span>
+            <div className="ff-score-track">
+              <div className="ff-score-fill ff-fill-gold" style={{ width: `${match}%` }} />
+            </div>
+            <span className="ff-score-num">{(match / 100).toFixed(2)}</span>
+          </div>
+          <div className="ff-score-row">
+            <span className="ff-score-lbl">Semantic fit</span>
+            <div className="ff-score-track">
+              <div className="ff-score-fill ff-fill-teal" style={{ width: `${similarityPct}%` }} />
+            </div>
+            <span className="ff-score-num">{(movie.similarity_score ?? 0).toFixed(2)}</span>
+          </div>
+        </div>
+        {movie.match_explanation && (
+          <div className="ff-breakdown-note">
+            Matched on: <em>{movie.match_explanation}</em>
+          </div>
+        )}
       </div>
     </article>
   );
@@ -324,9 +386,11 @@ export function FilmfindHome() {
 
   const [selectedStreaming, setSelectedStreaming] = useState<string[]>(STREAMING_OPTIONS);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(GENRE_OPTIONS);
+  const [selectedContentTypes, setSelectedContentTypes] = useState<string[]>(CONTENT_TYPE_OPTIONS);
   const [minRating, setMinRating] = useState(7.0);
   const [minYear, setMinYear] = useState(1980);
   const [sixtyModeOpen, setSixtyModeOpen] = useState(false);
+  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
 
   const filteredResults = useMemo(() => {
     return results.filter((movie) => {
@@ -392,9 +456,16 @@ export function FilmfindHome() {
     );
   };
 
+  const toggleContentType = (ct: string) => {
+    setSelectedContentTypes((current) =>
+      current.includes(ct) ? current.filter((item) => item !== ct) : [...current, ct]
+    );
+  };
+
   const clearFilters = () => {
     setSelectedStreaming(STREAMING_OPTIONS);
     setSelectedGenres(GENRE_OPTIONS);
+    setSelectedContentTypes(CONTENT_TYPE_OPTIONS);
     setMinRating(7);
     setMinYear(1980);
   };
@@ -449,16 +520,7 @@ export function FilmfindHome() {
                 Film<span>Find</span>
               </div>
 
-              <div className="ff-home-nav-links">
-                {NAV_ITEMS.map((item) => (
-                  <span key={item} className="ff-home-nav-link">
-                    {item}
-                  </span>
-                ))}
-                <button type="button" className="ff-home-nav-btn">
-                  Sign in
-                </button>
-              </div>
+              <div className="ff-home-nav-links" />
             </nav>
 
             <section className="ff-home-hero">
@@ -467,7 +529,7 @@ export function FilmfindHome() {
               <h1 className="ff-home-title">
                 DESCRIBE IT.
                 <span className="outline">FIND IT.</span>
-                <span className="gold">WATCH IT.</span>
+                WATCH IT.
               </h1>
 
               <p className="ff-home-sub">
@@ -635,6 +697,26 @@ export function FilmfindHome() {
                 </div>
 
                 <div className="ff-filter-group">
+                  <div className="ff-filter-group-label">Content type</div>
+                  {CONTENT_TYPE_OPTIONS.map((ct) => {
+                    const checked = selectedContentTypes.includes(ct);
+                    return (
+                      <button
+                        key={ct}
+                        type="button"
+                        className="ff-filter-option"
+                        onClick={() => toggleContentType(ct)}
+                      >
+                        <span className={`ff-filter-check ${checked ? "checked" : ""}`}>
+                          {checked ? "✓" : ""}
+                        </span>
+                        {ct}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="ff-filter-group">
                   <div className="ff-filter-group-label">IMDb Rating</div>
                   <input
                     type="range"
@@ -689,12 +771,17 @@ export function FilmfindHome() {
 
                 {!isSearching && filteredResults.length > 0 && (
                   <div className="ff-results-grid">
-                    {filteredResults.map((movie) => (
+                    {filteredResults.map((movie, index) => (
                       <ResultCard
                         key={movie.id}
                         movie={movie}
+                        rank={index + 1}
                         query={submittedQuery}
                         selectedStreaming={selectedStreaming}
+                        expandedId={expandedCardId}
+                        onToggleExpand={(id) =>
+                          setExpandedCardId((prev) => (prev === id ? null : id))
+                        }
                         onOpenDetails={openDetail}
                       />
                     ))}

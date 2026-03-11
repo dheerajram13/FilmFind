@@ -673,7 +673,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
           </button>
         </header>
 
-        <div className="ff60-stage">
+        <div className={`ff60-stage${screen === "result" ? " ff60-stage-result" : ""}`}>
           {isQuestionScreen && (
             <div className="ff60-q-wrap">
               <div className="ff60-step">
@@ -802,90 +802,221 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
           )}
 
           {screen === "result" && (
-            <div className="ff60-result-wrap">
-              <div className="ff60-result-eyebrow">
-                <span>✦</span> Your 60-second pick
-              </div>
-              <article className="ff60-result-card">
-                <div className="ff60-result-poster">
-                  <Image
-                    src={resultPosterUrl}
-                    alt={`${resolvedMovie.title} poster`}
-                    fill
-                    sizes="(max-width: 760px) 100vw, 720px"
-                    className="ff60-result-poster-image"
-                  />
-                  <div className="ff60-poster-tint" />
-                  <div className="ff60-poster-emoji">{genreEmoji(resolvedMovie)}</div>
-                  <div className="ff60-result-score">{resultMatch}% match</div>
+            <div className="ff60-result-v2">
+              {/* Hero backdrop */}
+              <div className="ff60-hero-backdrop">
+                <div className="ff60-orb ff60-orb-gold" />
+                <div className="ff60-orb ff60-orb-ember" />
+                <div className="ff60-orb ff60-orb-teal" />
+                <div className="ff60-film-strip" />
+
+                {/* Recap chips */}
+                <div className="ff60-recap-row">
+                  <div className="ff60-recap-chip">
+                    <div className="ff60-chip-dot ff60-dot-gold" />
+                    <span className="ff60-chip-key">Mood</span>
+                    <span className="ff60-chip-val">{activeMood.label}</span>
+                  </div>
+                  <div className="ff60-recap-chip">
+                    <div className="ff60-chip-dot ff60-dot-teal" />
+                    <span className="ff60-chip-key">Context</span>
+                    <span className="ff60-chip-val">{formatContextLabel(selectedContext ?? "")}</span>
+                  </div>
+                  <div className="ff60-recap-chip">
+                    <div className="ff60-chip-dot ff60-dot-ember" />
+                    <span className="ff60-chip-key">Craving</span>
+                    <span className="ff60-chip-val">{formatCravingLabel(selectedCraving ?? "")}</span>
+                  </div>
                 </div>
 
-                <div className="ff60-result-body">
-                  <div className="ff60-result-tags">
-                    {resultTags.map((tag) => (
-                      <span key={tag} className="ff60-result-tag">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <h3 className="ff60-result-title">{resolvedMovie.title.toUpperCase()}</h3>
-                  <div className="ff60-result-meta">
-                    <span className="rating">★ {(resolvedMovie.vote_average ?? 0).toFixed(1)}</span>
+                {/* Hero title */}
+                <div className="ff60-hero-content">
+                  <span className="ff60-hero-picked-label">FilmFind picked</span>
+                  <div className="ff60-hero-title">{resolvedMovie.title}</div>
+                  <div className="ff60-hero-meta">
+                    <span className="ff60-hero-rating">★ {(resolvedMovie.vote_average ?? 0).toFixed(1)}</span>
+                    <div className="ff60-meta-sep" />
                     <span>{parseYear(resolvedMovie.release_date)}</span>
-                    {resultMetaRuntime && <span>{resultMetaRuntime}</span>}
-                    <span>{resultLanguage}</span>
+                    {resolvedMovie.genres[0] && (
+                      <>
+                        <div className="ff60-meta-sep" />
+                        <span>{resolvedMovie.genres[0].name}</span>
+                      </>
+                    )}
+                    {resultMetaRuntime && (
+                      <>
+                        <div className="ff60-meta-sep" />
+                        <span>{resultMetaRuntime}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Match ring */}
+              <div className="ff60-ring-anchor">
+                <div className="ff60-ring-wrapper">
+                  <svg className="ff60-ring-svg" viewBox="0 0 104 104">
+                    <circle className="ff60-ring-track" cx="52" cy="52" r="42" />
+                    <circle
+                      className="ff60-ring-arc"
+                      cx="52" cy="52" r="42"
+                      strokeDasharray="263"
+                      strokeDashoffset={Math.round(263 * (1 - resultMatch / 100))}
+                    />
+                  </svg>
+                  <div className="ff60-ring-face">
+                    <span className="ff60-ring-pct">{resultMatch}%</span>
+                    <span className="ff60-ring-label">match</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="ff60-result-body-v2">
+
+                {/* Score strip */}
+                <div className="ff60-score-strip">
+                  <div className="ff60-strip-item">
+                    <div className="ff60-strip-label">
+                      <div className="ff60-strip-dot ff60-dot-gold" />
+                      Mood fit
+                    </div>
+                    <div className="ff60-strip-track">
+                      <div className="ff60-strip-fill ff60-fill-gold" style={{ width: `${Math.min(99, resultMatch)}%` }} />
+                    </div>
+                    <div className="ff60-strip-val">{(Math.min(99, resultMatch) / 100).toFixed(2)}</div>
+                  </div>
+                  <div className="ff60-strip-item">
+                    <div className="ff60-strip-label">
+                      <div className="ff60-strip-dot ff60-dot-teal" />
+                      Context fit
+                    </div>
+                    <div className="ff60-strip-track">
+                      <div className="ff60-strip-fill ff60-fill-teal" style={{ width: `${Math.max(70, resultMatch - 2)}%` }} />
+                    </div>
+                    <div className="ff60-strip-val">{(Math.max(70, resultMatch - 2) / 100).toFixed(2)}</div>
+                  </div>
+                  <div className="ff60-strip-item">
+                    <div className="ff60-strip-label">
+                      <div className="ff60-strip-dot ff60-dot-ember" />
+                      Craving fit
+                    </div>
+                    <div className="ff60-strip-track">
+                      <div className="ff60-strip-fill ff60-fill-ember" style={{ width: `${Math.max(65, resultMatch - 5)}%` }} />
+                    </div>
+                    <div className="ff60-strip-val">{(Math.max(65, resultMatch - 5) / 100).toFixed(2)}</div>
+                  </div>
+                </div>
+
+                {/* Reasons card */}
+                <div className="ff60-reasons-card">
+                  <div className="ff60-reasons-header">
+                    <span className="ff60-reasons-hl">Why FilmFind picked this for you</span>
+                    <div className="ff60-reasons-rule" />
                   </div>
 
-                  <p className="ff60-result-synopsis">
-                    {resolvedMovie.overview ||
-                      "A high-confidence FilmFind pick based on your mood, context, and desired emotional outcome."}
-                  </p>
-
-                  <p className="ff60-why-label">Why FilmFind picked this for you tonight</p>
-                  <div className="ff60-why-list">
-                    {resultWhy.map((reason) => (
-                      <div key={reason} className="ff60-why-pill">
-                        <span className="ff60-why-dot" />
-                        <span>{reason}</span>
+                  {resultWhy.slice(0, 3).map((reason, i) => {
+                    const icons = ["⚡", "🎯", "🌙"];
+                    const tags = [
+                      activeMood.label,
+                      formatCravingLabel(selectedCraving ?? ""),
+                      formatContextLabel(selectedContext ?? ""),
+                    ];
+                    const colors = ["gold", "ember", "teal"] as const;
+                    return (
+                      <div key={reason} className={`ff60-reason-item ff60-reason-${i + 1}`}>
+                        <div className="ff60-reason-accent">
+                          <div className={`ff60-accent-icon ff60-icon-${colors[i]}`}>{icons[i]}</div>
+                          <span className={`ff60-accent-tag ff60-tag-${colors[i]}`}>{tags[i]}</span>
+                        </div>
+                        <div className="ff60-reason-text-col">
+                          <div className="ff60-reason-headline">{reason}</div>
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })}
+                </div>
+
+                {/* Actions card */}
+                <div className="ff60-actions-card">
+                  <div>
+                    <div className="ff60-streaming-label-row">
+                      <span className="ff60-streaming-label">Available on</span>
+                    </div>
+                    <div className="ff60-streaming-chips">
+                      <button type="button" className="ff60-stream-chip">
+                        <div className="ff60-stream-chip-dot" />
+                        {watchProvider}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="ff60-result-actions">
-                    <button type="button" className="ff60-btn-watch" onClick={() => {
+                  <button
+                    type="button"
+                    className="ff60-btn-primary"
+                    onClick={() => {
                       if (resultSessionId) apiClient.sixtyAction(resultSessionId, { watch_clicked: true }).catch(() => {});
                       onApplyQuery(resultQuery);
-                    }}>
-                      ▶ Watch on {watchProvider}
+                    }}
+                  >
+                    ▶ &nbsp;Watch on {watchProvider}
+                  </button>
+
+                  <div className="ff60-btn-row">
+                    <button
+                      type="button"
+                      className="ff60-btn-secondary ff60-btn-share"
+                      onClick={() => {
+                        if (resultSessionId) apiClient.sixtyAction(resultSessionId, { share_clicked: true }).catch(() => {});
+                        setShareOpen(true);
+                      }}
+                    >
+                      ↗ Share result
                     </button>
-                    <button type="button" className="ff60-btn-share" onClick={() => {
-                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { share_clicked: true }).catch(() => {});
-                      setShareOpen(true);
-                    }}>
-                      ↗ Share
-                    </button>
-                    <button type="button" className="ff60-btn-retry" onClick={() => {
-                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { retry_clicked: true }).catch(() => {});
-                      resetFlow();
-                    }}>
-                      Try again
+                    <button
+                      type="button"
+                      className="ff60-btn-secondary"
+                      onClick={() => {
+                        if (resultSessionId) apiClient.sixtyAction(resultSessionId, { retry_clicked: true }).catch(() => {});
+                        resetFlow();
+                      }}
+                    >
+                      ↺ &nbsp;Try again
                     </button>
                   </div>
                 </div>
-              </article>
+
+                {/* Bottom links */}
+                <div className="ff60-bottom-row">
+                  <button type="button" className="ff60-bottom-link" onClick={onClose}>
+                    ← Back to search
+                  </button>
+                  <div className="ff60-bottom-sep" />
+                  <button type="button" className="ff60-bottom-link">
+                    + Add to watchlist
+                  </button>
+                  <div className="ff60-bottom-sep" />
+                  <button type="button" className="ff60-bottom-link">
+                    Details →
+                  </button>
+                </div>
+
+              </div>
             </div>
           )}
         </div>
 
-        <footer className="ff60-footer">
-          <span className={`ff60-footer-label ${timerRunning ? "active" : ""}`}>{footerLabel}</span>
-          {isQuestionScreen && (
-            <button type="button" className="ff60-skip" onClick={skipToResult}>
-              Skip to result →
-            </button>
-          )}
-        </footer>
+        {screen !== "result" && (
+          <footer className="ff60-footer">
+            <span className={`ff60-footer-label ${timerRunning ? "active" : ""}`}>{footerLabel}</span>
+            {isQuestionScreen && (
+              <button type="button" className="ff60-skip" onClick={skipToResult}>
+                Skip to result →
+              </button>
+            )}
+          </footer>
+        )}
       </section>
 
       {shareOpen && (
