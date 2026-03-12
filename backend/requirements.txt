@@ -9,6 +9,9 @@ psycopg2-binary==2.9.9
 alembic==1.12.1
 pgvector==0.3.6
 
+# Supabase
+supabase==2.10.0
+
 # Pydantic for data validation
 pydantic==2.5.0
 pydantic-settings==2.1.0

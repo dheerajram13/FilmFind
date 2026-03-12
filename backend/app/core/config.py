@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     CACHE_ENABLED: bool = Field(default=True, description="Enable/disable caching")
     CACHE_TTL: int = 3600  # 1 hour default TTL
 
+    # Upstash Redis (production — overrides REDIS_HOST/PORT when set)
+    UPSTASH_REDIS_URL: str = Field(default="", description="Upstash Redis URL (rediss://...) — leave empty to use Docker Redis")
+
+    # Supabase
+    SUPABASE_URL: str = Field(default="", description="Supabase project URL (https://[ref].supabase.co)")
+    SUPABASE_ANON_KEY: str = Field(default="", description="Supabase anon/public key — safe for frontend reads")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", description="Supabase service role key — backend only, never expose to frontend")
+    SUPABASE_STORAGE_BUCKET: str = Field(default="media-images", description="Supabase Storage bucket for media images")
+
     # TMDB API
     TMDB_API_KEY: str = Field(default="", description="TMDB API key for fetching movie data")
     TMDB_BASE_URL: str = "https://api.themoviedb.org/3"

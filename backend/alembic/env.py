@@ -24,7 +24,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the database URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Use %% escaping for configparser compatibility (special chars in passwords)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # Add model's MetaData for autogenerate support
 target_metadata = Base.metadata
@@ -61,12 +62,8 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine and associate
     a connection with the context.
     """
-    
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    from sqlalchemy import create_engine
+    connectable = create_engine(settings.DATABASE_URL, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(

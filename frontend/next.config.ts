@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
         hostname: "image.tmdb.org",
         pathname: "/t/p/**",
       },
+      {
+        // Supabase Storage CDN
+        protocol: "https",
+        hostname: "hmfqdofdkzpphmjxdqgl.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
     // Disable optimization for TMDB images to avoid timeout issues in Docker
     unoptimized: true,
