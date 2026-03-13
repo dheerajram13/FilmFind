@@ -33,7 +33,7 @@ spacy==3.7.2
 nltk==3.8.1
 
 # HTTP Clients
-httpx==0.25.1
+httpx>=0.26,<0.28
 requests==2.31.0
 
 # Caching
@@ -58,7 +58,6 @@ loguru==0.7.2
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-httpx==0.25.1
 
 # Code Quality & Linting
 ruff==0.6.9              # Fast linter & formatter (replaces black, flake8, isort)
