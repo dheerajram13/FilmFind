@@ -14,6 +14,7 @@ Usage:
     python scripts/ingest_media.py --movies 5 --dry-run
 """
 import argparse
+import json
 import sys
 import time
 from datetime import datetime, timezone
@@ -40,6 +41,15 @@ RATE_DELAY = 0.3
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _j(val) -> Optional[str]:
+    """Serialize dicts/lists to JSON string for JSONB columns via psycopg2."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return json.dumps(val)
+    return val
 
 
 def _upsert_genres(db, genre_names: list[str]) -> dict[str, int]:
@@ -270,11 +280,11 @@ def ingest_movies(max_pages: int, dry_run: bool = False):
                 "poster_path": cleaned.get("poster_path"),
                 "backdrop_path": cleaned.get("backdrop_path"),
                 "imdb_id": cleaned.get("imdb_id"),
-                "belongs_to_collection": cleaned.get("belongs_to_collection"),
+                "belongs_to_collection": _j(cleaned.get("belongs_to_collection")),
                 "production_countries": cleaned.get("production_countries") or [],
                 "spoken_languages": cleaned.get("spoken_languages") or [],
                 "origin_country": cleaned.get("origin_country") or [],
-                "production_companies": cleaned.get("production_companies") or [],
+                "production_companies": _j(cleaned.get("production_companies") or []),
             })
             row = result.fetchone()
             media_id = row.id
@@ -416,7 +426,7 @@ def ingest_tv(max_pages: int, dry_run: bool = False):
                 "production_countries": cleaned.get("production_countries") or [],
                 "spoken_languages": cleaned.get("spoken_languages") or [],
                 "origin_country": cleaned.get("origin_country") or [],
-                "production_companies": cleaned.get("production_companies") or [],
+                "production_companies": _j(cleaned.get("production_companies") or []),
             })
             row = result.fetchone()
             media_id = row.id
@@ -439,12 +449,12 @@ def ingest_tv(max_pages: int, dry_run: bool = False):
                 "id": media_id,
                 "seasons": full.get("number_of_seasons"),
                 "episodes": full.get("number_of_episodes"),
-                "run_time": full.get("episode_run_time"),
+                "run_time": _j(full.get("episode_run_time")),
                 "first_air": cleaned.get("release_date"),
                 "last_air": tmdb.validator._parse_date(full.get("last_air_date")),
                 "in_production": full.get("in_production", False),
-                "networks": cleaned.get("networks") or [],
-                "created_by": cleaned.get("created_by") or [],
+                "networks": _j(cleaned.get("networks") or []),
+                "created_by": _j(cleaned.get("created_by") or []),
                 "show_type": cleaned.get("show_type"),
             })
 
