@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "@/lib/api-client";
 import { getBackdropUrl, getPlaceholderImage, getPosterUrl } from "@/lib/image-utils";
-import { Movie, SixtyContext, SixtyMood, SixtyyCraving } from "@/types/api";
+import { parseYearString, runtimeLabel as formatRuntime } from "@/lib/movie-formatters";
+import { primaryProvider } from "@/lib/streaming-providers";
+import { Movie, SixtyActionRequest, SixtyContext, SixtyMood, SixtyyCraving } from "@/types/api";
 
 type Screen = "q1" | "q2" | "q3" | "analysing" | "result";
 
@@ -24,6 +26,12 @@ type SixtySecondModeProps = {
   onClose: () => void;
   onApplyQuery: (query: string) => void;
 };
+
+const ANALYSIS_RING_RADIUS = 24;
+const ANALYSIS_RING_CIRCUMFERENCE = Math.round(2 * Math.PI * ANALYSIS_RING_RADIUS * 10) / 10; // 150.8
+
+const RESULT_RING_RADIUS = 42;
+const RESULT_RING_CIRCUMFERENCE = Math.round(2 * Math.PI * RESULT_RING_RADIUS); // 264
 
 const PROGRESS_BY_SCREEN: Record<Screen, number> = {
   q1: 10,
@@ -234,59 +242,6 @@ function formatStepTitle(screen: Screen): string {
   return "";
 }
 
-function parseYear(value: string | null): string {
-  if (!value) return "TBA";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "TBA";
-  return String(date.getFullYear());
-}
-
-function runtimeLabel(runtime: number | null): string | null {
-  if (!runtime || runtime <= 0) return null;
-  return `${runtime} min`;
-}
-
-function genreEmoji(movie: Movie): string {
-  const firstGenre = movie.genres[0]?.name.toLowerCase() ?? "";
-  if (firstGenre.includes("drama")) return "🎭";
-  if (firstGenre.includes("thriller")) return "🔍";
-  if (firstGenre.includes("sci")) return "🛸";
-  if (firstGenre.includes("horror")) return "🪦";
-  if (firstGenre.includes("comedy")) return "😂";
-  if (firstGenre.includes("animation")) return "🧠";
-  return "🎬";
-}
-
-function normalizeProviderName(provider: string): string {
-  const lower = provider.toLowerCase();
-  if (lower.includes("prime")) return "Prime Video";
-  if (lower.includes("hbo") || lower === "max") return "HBO Max";
-  if (lower.includes("apple")) return "Apple TV+";
-  if (lower.includes("netflix")) return "Netflix";
-  if (lower.includes("hulu")) return "Hulu";
-  return provider;
-}
-
-function collectProviderNames(value: unknown, sink: Set<string>) {
-  if (!value) return;
-  if (Array.isArray(value)) {
-    value.forEach((entry) => collectProviderNames(entry, sink));
-    return;
-  }
-  if (typeof value !== "object") return;
-  const objectValue = value as Record<string, unknown>;
-  const providerName = objectValue.provider_name;
-  if (typeof providerName === "string" && providerName.length > 0) sink.add(providerName);
-  Object.values(objectValue).forEach((entry) => collectProviderNames(entry, sink));
-}
-
-function primaryProvider(movie: Movie): string {
-  if (!movie.streaming_providers || typeof movie.streaming_providers !== "object") return "Netflix";
-  const names = new Set<string>();
-  collectProviderNames(movie.streaming_providers, names);
-  const first = Array.from(names)[0];
-  return first ? normalizeProviderName(first) : "Netflix";
-}
 
 function formatContextLabel(key: string): string {
   return optionFor(CONTEXT_OPTIONS, key, CONTEXT_FALLBACK).label;
@@ -379,7 +334,7 @@ async function resolveMovieSixtyPick(
     const query = buildModeQuery(moodKey, contextKey, cravingKey);
     try {
       const searchResponse = await apiClient.search(query, undefined, 12);
-      const film = searchResponse.results[0] as unknown as Movie | undefined;
+      const film: Movie | undefined = searchResponse.results[0];
       if (film) {
         const mood = optionFor(MOOD_OPTIONS, moodKey, MOOD_FALLBACK);
         const context = optionFor(CONTEXT_OPTIONS, contextKey, CONTEXT_FALLBACK);
@@ -401,6 +356,14 @@ async function resolveMovieSixtyPick(
       sessionId: "",
     };
   }
+}
+
+/** Fire-and-forget analytics call — failures are non-fatal and logged only. */
+function logSixtyAction(sessionId: string, action: SixtyActionRequest): void {
+  if (!sessionId) return;
+  apiClient.sixtyAction(sessionId, action).catch((err: unknown) => {
+    console.warn("[60sec] action log failed:", err);
+  });
 }
 
 export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondModeProps) {
@@ -515,8 +478,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
   const activeCraving = optionFor(CRAVING_OPTIONS, selectedCraving, CRAVING_FALLBACK);
 
   const ringOffset = useMemo(() => {
-    const circumference = 150.8;
-    return circumference * (1 - analysisCountdown / 3);
+    return ANALYSIS_RING_CIRCUMFERENCE * (1 - analysisCountdown / 3);
   }, [analysisCountdown]);
 
   const resultPosterUrl = resultMovie
@@ -613,7 +575,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
     queueTimeout(() => runAnalysis(moodKey, contextKey, key), 350);
   };
 
-  const resultMetaRuntime = runtimeLabel(resolvedMovie.runtime);
+  const resultMetaRuntime = formatRuntime(resolvedMovie.runtime);
   const resultTags = resolvedMovie.genres.slice(0, 3).map((genre) => genre.name);
   const resultLanguage = resolvedMovie.original_language?.toUpperCase() || "N/A";
   const watchProvider = primaryProvider(resolvedMovie);
@@ -766,13 +728,13 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
             <div className="ff60-analysing">
               <div className="ff60-ring-wrap">
                 <svg viewBox="0 0 56 56" width="56" height="56">
-                  <circle className="ff60-ring-bg" cx="28" cy="28" r="24" />
+                  <circle className="ff60-ring-bg" cx="28" cy="28" r={ANALYSIS_RING_RADIUS} />
                   <circle
                     className="ff60-ring-fill"
                     cx="28"
                     cy="28"
-                    r="24"
-                    strokeDasharray="150.8"
+                    r={ANALYSIS_RING_RADIUS}
+                    strokeDasharray={ANALYSIS_RING_CIRCUMFERENCE}
                     strokeDashoffset={ringOffset}
                   />
                 </svg>
@@ -788,7 +750,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
               <div className="ff60-analysis-steps">
                 {ANALYSIS_STEPS.map((step, index) => {
                   const visible = analysisVisibleSteps > index;
-                  const done = analysisVisibleSteps > index;
+                  const done = analysisVisibleSteps >= ANALYSIS_STEPS.length;
                   return (
                     <div key={step.text} className={`ff60-analysis-step ${visible ? "show" : ""} ${done ? "done" : ""}`}>
                       <span className="ff60-analysis-icon">{step.icon}</span>
@@ -836,7 +798,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                   <div className="ff60-hero-meta">
                     <span className="ff60-hero-rating">★ {(resolvedMovie.vote_average ?? 0).toFixed(1)}</span>
                     <div className="ff60-meta-sep" />
-                    <span>{parseYear(resolvedMovie.release_date)}</span>
+                    <span>{parseYearString(resolvedMovie.release_date)}</span>
                     {resolvedMovie.genres[0] && (
                       <>
                         <div className="ff60-meta-sep" />
@@ -857,12 +819,12 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
               <div className="ff60-ring-anchor">
                 <div className="ff60-ring-wrapper">
                   <svg className="ff60-ring-svg" viewBox="0 0 104 104">
-                    <circle className="ff60-ring-track" cx="52" cy="52" r="42" />
+                    <circle className="ff60-ring-track" cx="52" cy="52" r={RESULT_RING_RADIUS} />
                     <circle
                       className="ff60-ring-arc"
-                      cx="52" cy="52" r="42"
-                      strokeDasharray="263"
-                      strokeDashoffset={Math.round(263 * (1 - resultMatch / 100))}
+                      cx="52" cy="52" r={RESULT_RING_RADIUS}
+                      strokeDasharray={RESULT_RING_CIRCUMFERENCE}
+                      strokeDashoffset={Math.round(RESULT_RING_CIRCUMFERENCE * (1 - resultMatch / 100))}
                     />
                   </svg>
                   <div className="ff60-ring-face">
@@ -956,7 +918,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                     type="button"
                     className="ff60-btn-primary"
                     onClick={() => {
-                      if (resultSessionId) apiClient.sixtyAction(resultSessionId, { watch_clicked: true }).catch(() => {});
+                      logSixtyAction(resultSessionId, { watch_clicked: true });
                       onApplyQuery(resultQuery);
                     }}
                   >
@@ -968,7 +930,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                       type="button"
                       className="ff60-btn-secondary ff60-btn-share"
                       onClick={() => {
-                        if (resultSessionId) apiClient.sixtyAction(resultSessionId, { share_clicked: true }).catch(() => {});
+                        logSixtyAction(resultSessionId, { share_clicked: true });
                         setShareOpen(true);
                       }}
                     >
@@ -978,7 +940,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                       type="button"
                       className="ff60-btn-secondary"
                       onClick={() => {
-                        if (resultSessionId) apiClient.sixtyAction(resultSessionId, { retry_clicked: true }).catch(() => {});
+                        logSixtyAction(resultSessionId, { retry_clicked: true });
                         resetFlow();
                       }}
                     >
