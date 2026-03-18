@@ -123,6 +123,8 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_SEARCH_PER_MINUTE: int = 20   # /api/search (LLM-heavy)
+    RATE_LIMIT_SIXTY_PER_MINUTE: int = 10    # /api/sixty/pick (LLM-heavy)
 
     # Background Jobs
     ENABLE_BACKGROUND_JOBS: bool = False

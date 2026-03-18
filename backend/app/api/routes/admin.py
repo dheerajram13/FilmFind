@@ -12,13 +12,11 @@ from collections import Counter
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import DatabaseSession
+from app.api.dependencies import DatabaseSession, require_admin
 from app.core.cache_manager import get_cache_manager
-from app.core.config import settings
 from app.core.scoring import VALID_CONTEXTS, VALID_CRAVINGS, VALID_MOODS
 from app.models.media import Media
 from app.models.session import SearchSession, SixtySession
@@ -29,28 +27,6 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-_bearer = HTTPBearer(auto_error=False)
-
-
-def _require_admin(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> None:
-    """Verify the Bearer token matches ADMIN_SECRET."""
-    secret = settings.ADMIN_SECRET
-    if not secret:
-        # Admin secret not configured — block all admin requests
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin endpoints are not enabled (ADMIN_SECRET not configured)",
-        )
-    if credentials is None or credentials.credentials != secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing admin token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-
 # ---------------------------------------------------------------------------
 # Enrichment endpoints
 # ---------------------------------------------------------------------------
@@ -59,7 +35,7 @@ def _require_admin(
 @router.post(
     "/enrich/{film_id}",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(_require_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def enrich_film(film_id: int, db: DatabaseSession) -> dict:
     """Run Stage 2 Gemini enrichment on a single film."""
@@ -114,7 +90,7 @@ async def enrich_film(film_id: int, db: DatabaseSession) -> dict:
 @router.post(
     "/embed/{film_id}",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(_require_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def regenerate_embedding(film_id: int, db: DatabaseSession) -> dict:
     """Regenerate the FAISS embedding for a single film."""
@@ -149,7 +125,7 @@ async def regenerate_embedding(film_id: int, db: DatabaseSession) -> dict:
 @router.post(
     "/cache/sixty/refresh",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(_require_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def refresh_sixty_cache(db: DatabaseSession) -> dict:
     """
@@ -209,7 +185,7 @@ async def refresh_sixty_cache(db: DatabaseSession) -> dict:
 @router.get(
     "/analytics/searches",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(_require_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def analytics_searches(db: DatabaseSession, limit: int = 20) -> dict:
     """Top search queries and click-through rates from search_sessions."""
@@ -244,7 +220,7 @@ async def analytics_searches(db: DatabaseSession, limit: int = 20) -> dict:
 @router.get(
     "/analytics/sixty",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(_require_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def analytics_sixty(db: DatabaseSession) -> dict:
     """Mood/context/craving breakdown from sixty_sessions."""

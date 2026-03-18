@@ -101,6 +101,8 @@ def _build_client(mock_films):
     The router already defines prefix="/sixty" internally,
     so we mount it without an extra prefix.
     """
+    from app.api.routes.sixty import _sixty_rate_limit
+
     app = FastAPI()
     app.include_router(router)  # router has prefix="/sixty" built-in
 
@@ -111,6 +113,8 @@ def _build_client(mock_films):
     mock_db.query.return_value = mock_query
 
     app.dependency_overrides[get_db] = lambda: mock_db
+    # Bypass Redis rate limiter so tests don't hit real Redis
+    app.dependency_overrides[_sixty_rate_limit] = lambda: None
     return TestClient(app, raise_server_exceptions=True)
 
 

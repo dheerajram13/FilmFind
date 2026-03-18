@@ -15,11 +15,12 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import DatabaseSession
+from app.api.dependencies import DatabaseSession, make_rate_limit_dependency
 from app.core.cache_manager import get_cache_manager
+from app.core.config import settings
 from app.core.scoring import (
     CONTEXT_MAX_DARKNESS,
     VALID_CONTEXTS,
@@ -40,6 +41,7 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/sixty", tags=["sixty"])
 
+_sixty_rate_limit = make_rate_limit_dependency(settings.RATE_LIMIT_SIXTY_PER_MINUTE)
 _SIXTY_CACHE_TTL = 86400  # 24 hours
 
 
@@ -49,12 +51,33 @@ _SIXTY_CACHE_TTL = 86400  # 24 hours
 
 
 class SixtyPickRequest(BaseModel):
-    mood: str
-    context: str
-    craving: str
+    mood: str = Field(..., max_length=50)
+    context: str = Field(..., max_length=50)
+    craving: str = Field(..., max_length=50)
     session_token: str = ""
     region: Optional[str] = None
     seconds_taken: Optional[int] = None
+
+    @field_validator("mood")
+    @classmethod
+    def mood_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_MOODS:
+            raise ValueError(f"Invalid mood. Valid values: {sorted(VALID_MOODS)}")
+        return v
+
+    @field_validator("context")
+    @classmethod
+    def context_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_CONTEXTS:
+            raise ValueError(f"Invalid context. Valid values: {sorted(VALID_CONTEXTS)}")
+        return v
+
+    @field_validator("craving")
+    @classmethod
+    def craving_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_CRAVINGS:
+            raise ValueError(f"Invalid craving. Valid values: {sorted(VALID_CRAVINGS)}")
+        return v
 
 
 class SixtyPickResponse(BaseModel):
@@ -117,7 +140,7 @@ def _store_candidates_in_cache(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/pick", status_code=status.HTTP_200_OK, response_model=SixtyPickResponse)
+@router.post("/pick", status_code=status.HTTP_200_OK, response_model=SixtyPickResponse, dependencies=[Depends(_sixty_rate_limit)])
 async def sixty_pick(
     request: SixtyPickRequest,
     db: DatabaseSession,
@@ -135,23 +158,6 @@ async def sixty_pick(
     5. log_sixty_session() fire-and-forget
     6. Return film + match_score + why_reasons
     """
-    # Validate enum values
-    if request.mood not in VALID_MOODS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid mood '{request.mood}'. Valid values: {sorted(VALID_MOODS)}",
-        )
-    if request.context not in VALID_CONTEXTS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid context '{request.context}'. Valid values: {sorted(VALID_CONTEXTS)}",
-        )
-    if request.craving not in VALID_CRAVINGS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid craving '{request.craving}'. Valid values: {sorted(VALID_CRAVINGS)}",
-        )
-
     # Try cache first
     scored = _load_candidates_from_cache(db, request.mood, request.context, request.craving)
     cache_hit = scored is not None

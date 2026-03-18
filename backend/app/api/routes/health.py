@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db
+from app.api.dependencies import get_db, require_admin
 from app.core.cache_manager import get_cache_manager
 from app.core.config import settings
 from app.core.scheduler import get_scheduler
@@ -61,7 +61,6 @@ async def detailed_health_check(db: Session = Depends(get_db)):
 
     # Check database
     try:
-        # Execute simple query
         db.execute(text("SELECT 1"))
         db.commit()
         health_status["checks"]["database"] = {
@@ -72,35 +71,30 @@ async def detailed_health_check(db: Session = Depends(get_db)):
         logger.error(f"Database health check failed: {exc}")
         health_status["checks"]["database"] = {
             "status": "unhealthy",
-            "message": f"Database error: {exc!s}",
+            "message": "Database connection failed",
         }
         health_status["status"] = "unhealthy"
 
-    # Check configuration
-    config_status = "healthy"
-    config_issues = []
+    # Check configuration — report generic warnings without leaking key names
+    config_ok = bool(settings.DATABASE_URL)
+    has_warnings = not (settings.TMDB_API_KEY and (settings.GEMINI_API_KEY or settings.GROQ_API_KEY))
 
-    if not settings.DATABASE_URL:
-        config_issues.append("DATABASE_URL not configured")
-        config_status = "unhealthy"
-
-    if not settings.TMDB_API_KEY:
-        config_issues.append("TMDB_API_KEY not configured")
-
-    if not settings.GROQ_API_KEY and settings.LLM_PROVIDER == "groq":
-        config_issues.append("GROQ_API_KEY not configured")
-
-    health_status["checks"]["configuration"] = {
-        "status": config_status,
-        "message": "Configuration valid" if not config_issues else ", ".join(config_issues),
-    }
-
-    if config_status == "unhealthy":
+    if not config_ok:
+        health_status["checks"]["configuration"] = {
+            "status": "unhealthy",
+            "message": "Required configuration missing",
+        }
         health_status["status"] = "unhealthy"
-
-    # Overall health assessment
-    if health_status["status"] == "unhealthy":
-        return health_status  # FastAPI will still return 200, but with unhealthy status
+    elif has_warnings:
+        health_status["checks"]["configuration"] = {
+            "status": "warning",
+            "message": "One or more optional API keys not configured",
+        }
+    else:
+        health_status["checks"]["configuration"] = {
+            "status": "healthy",
+            "message": "Configuration valid",
+        }
 
     return health_status
 
@@ -137,10 +131,10 @@ async def ping():
     }
 
 
-@router.get("/cache/stats", status_code=status.HTTP_200_OK)
+@router.get("/cache/stats", status_code=status.HTTP_200_OK, dependencies=[Depends(require_admin)])
 async def get_cache_stats():
     """
-    Get cache statistics (hits, misses, hit rate).
+    Get cache statistics (hits, misses, hit rate). Requires admin auth.
 
     Returns:
         Cache performance metrics
@@ -180,10 +174,10 @@ async def get_scheduled_jobs():
     }
 
 
-@router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK)
+@router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK, dependencies=[Depends(require_admin)])
 async def trigger_job(job_id: str):
     """
-    Manually trigger a background job to run immediately.
+    Manually trigger a background job to run immediately. Requires admin auth.
 
     Args:
         job_id: ID of the job to trigger
@@ -208,5 +202,5 @@ async def trigger_job(job_id: str):
 
     return {
         "success": False,
-        "message": f"Job '{job_id}' not found",
+        "message": f"Job not found",
     }

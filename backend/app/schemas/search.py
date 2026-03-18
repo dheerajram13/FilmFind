@@ -1,9 +1,10 @@
 """
 Search request/response schemas
 """
+import re
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.movie import MovieSearchResult
 
@@ -27,10 +28,17 @@ class SearchFilters(BaseModel):
 class SearchRequest(BaseModel):
     """Search request"""
 
-    query: str = Field(..., description="Natural language search query")
-    limit: int = Field(10, ge=1, le=50, description="Number of results to return")
+    query: str = Field(..., min_length=3, max_length=500, description="Natural language search query")
+    limit: int = Field(default=10, ge=1, le=20, description="Number of results to return")
     filters: Optional[SearchFilters] = None
     session_token: Optional[str] = Field(None, description="Client session token for analytics")
+
+    @field_validator("query")
+    @classmethod
+    def no_html_tags(cls, v: str) -> str:
+        if re.search(r"<[^>]+>", v):
+            raise ValueError("Invalid characters in query")
+        return v.strip()
 
 
 class QueryInterpretation(BaseModel):

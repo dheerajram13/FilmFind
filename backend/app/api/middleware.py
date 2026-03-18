@@ -87,10 +87,10 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             logger.warning(f"{exc.error_type}: {exc.message}", extra={"details": exc.details})
             return self._create_error_response(exc)
         except ValueError as exc:
-            # Validation errors from Pydantic or other libraries
+            # Validation errors from Pydantic or other libraries — log details server-side only
             logger.warning(f"Validation error: {exc}")
             api_exc = APIException(
-                message=str(exc),
+                message="Invalid request parameters",
                 status_code=400,
                 error_type="validation_error",
             )
@@ -150,5 +150,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
 
         return response

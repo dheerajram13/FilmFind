@@ -47,6 +47,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001, ANN201
     # pgvector is used for vector search — no pre-loading needed (index lives in Postgres)
     logger.info("Vector search: pgvector (HNSW cosine index in Postgres)")
 
+    # Warn loudly if SECRET_KEY is the insecure default
+    _INSECURE_KEY = "your-secret-key-change-in-production"
+    if settings.SECRET_KEY == _INSECURE_KEY:
+        logger.critical("SECRET_KEY is the insecure default — set a strong key in .env before production use")
+
     # Start background job scheduler
     start_scheduler()
 
@@ -96,8 +101,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "X-API-Key"],
 )
 
 # GZip compression middleware

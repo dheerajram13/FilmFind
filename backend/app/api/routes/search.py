@@ -27,7 +27,8 @@ from app.api.constants import (
     RETRIEVAL_MULTIPLIER,
     SIMILAR_MOVIES_BUFFER,
 )
-from app.api.dependencies import DatabaseSession, PaginationParams
+from app.api.dependencies import DatabaseSession, PaginationParams, make_rate_limit_dependency
+from app.core.config import settings
 from app.api.exceptions import ValidationException
 from app.core.cache_strategies import (
     FilterCacheStrategy,
@@ -68,6 +69,8 @@ from app.utils.query_interpretation import (
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api", tags=["search"])
+
+_search_rate_limit = make_rate_limit_dependency(settings.RATE_LIMIT_SEARCH_PER_MINUTE)
 
 
 # =============================================================================
@@ -115,7 +118,7 @@ def get_constraint_validator() -> ConstraintValidator:
 # =============================================================================
 
 
-@router.post("/search", status_code=status.HTTP_200_OK, response_model=SearchResponse)
+@router.post("/search", status_code=status.HTTP_200_OK, response_model=SearchResponse, dependencies=[Depends(_search_rate_limit)])
 async def search_movies(
     request: SearchRequest,
     db: DatabaseSession,  # noqa: ARG001
