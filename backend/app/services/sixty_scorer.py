@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.core.scoring import (
     CONTEXT_MAX_DARKNESS,
@@ -36,6 +36,10 @@ logger = get_logger(__name__)
 
 # Number of scored candidates returned from the DB (weighted_random_top3 picks 1)
 _TOP_K = 10
+assert isinstance(_TOP_K, int) and 1 <= _TOP_K <= 100, "Invalid _TOP_K"
+
+# Whitelist of allowed mood score keys — guards the f-string SQL fragment
+_ALLOWED_MOOD_KEYS: frozenset[str] = frozenset(_MOOD_SCORE_KEYS)
 
 
 def score_films_sql(
@@ -43,9 +47,19 @@ def score_films_sql(
     mood: str,
     context: str,
     craving: str,
+    excluded_film_ids: list[int] | None = None,
+    user_id: str | None = None,
 ) -> list[tuple[Media, float]]:
     """
     Score all fully-enriched films in Postgres and return the top _TOP_K.
+
+    Args:
+        db: SQLAlchemy session.
+        mood: Validated mood string (e.g. "happy").
+        context: Validated context string (e.g. "solo-night").
+        craving: Validated craving string (e.g. "laugh").
+        excluded_film_ids: Film IDs to exclude (e.g. already seen this session).
+        user_id: If provided, exclude films marked watched by this user.
 
     Returns:
         List of (Media, score) tuples ordered by score descending, length ≤ _TOP_K.
@@ -59,15 +73,20 @@ def score_films_sql(
     # Dimensional weights from mood profile
     dim_keys = ["energy", "complexity"]
     dim_w = {k: profile.get(k, 0.0) for k in dim_keys}
-    dim_abs = sum(abs(w) for w in dim_w.values()) or 1.0
+    dim_abs = sum(abs(w) for w in dim_w.values()) or 1.0  # fallback to 1.0 → neutral 0.5 score
 
     # Mood fingerprint weights from mood profile (mood_* keys → strip prefix)
     mood_w = {k: profile.get(f"mood_{k}", 0.0) for k in _MOOD_SCORE_KEYS}
-    mood_abs = sum(abs(w) for w in mood_w.values()) or 1.0
+    mood_abs = sum(abs(w) for w in mood_w.values()) or 1.0  # fallback to 1.0 → neutral 0.5 score
 
     # Craving dimensional weights from booster
     crav_dim_w = {k: booster.get(k, 0.0) for k in dim_keys}
-    crav_dim_abs = sum(abs(w) for w in crav_dim_w.values()) or 1.0
+    crav_dim_abs = sum(abs(w) for w in crav_dim_w.values()) or 1.0  # fallback to 1.0 → neutral 0.5 score
+
+    # ── Validate mood keys before injecting into SQL f-string ─────────────
+    for k in _MOOD_SCORE_KEYS:
+        if k not in _ALLOWED_MOOD_KEYS or not k.isidentifier():
+            raise ValueError(f"Invalid mood key: {k!r}")
 
     # ── Build SQL parameter dict ──────────────────────────────────────────
     params: dict[str, Any] = {
@@ -84,6 +103,11 @@ def score_films_sql(
         "cw_energy": crav_dim_w["energy"],
         "cw_complexity": crav_dim_w["complexity"],
         "crav_dim_abs": crav_dim_abs,
+        # Exclusion lists
+        "excluded_ids": excluded_film_ids or [],
+        "no_exclusions": not bool(excluded_film_ids),
+        "user_id": user_id or "",
+        "no_user": user_id is None,
     }
     # Add one param per mood key
     for k in _MOOD_SCORE_KEYS:
@@ -91,7 +115,7 @@ def score_films_sql(
 
     # ── Build mood_raw SQL fragment ───────────────────────────────────────
     # mood_scores JSONB is keyed by mood name (happy, sad, charged, ...)
-    # Use COALESCE((mood_scores ->> 'key')::float, 0.5) for missing keys
+    # Keys are validated above — safe to use in f-string.
     mood_raw_parts = " + ".join(
         f":mw_{k} * COALESCE((mood_scores ->> '{k}')::float, 0.5)"
         for k in _MOOD_SCORE_KEYS
@@ -139,6 +163,14 @@ def score_films_sql(
             adult = FALSE
             AND is_fully_scored = TRUE
             AND COALESCE(darkness_score, 5) <= :max_dark
+            AND (:no_exclusions OR id != ALL(:excluded_ids))
+            AND (
+                :no_user
+                -- user_watched table added when auth is implemented
+                OR id NOT IN (
+                    SELECT film_id FROM user_watched WHERE user_id = :user_id
+                )
+            )
         ORDER BY score DESC
         LIMIT {_TOP_K}
     """)
@@ -149,11 +181,43 @@ def score_films_sql(
         logger.info(f"score_films_sql: no enriched films for {mood}/{context}/{craving}")
         return []
 
-    # Bulk-fetch the ORM objects for the returned IDs (preserves order)
+    # Bulk-fetch the ORM objects for the returned IDs (preserves order).
+    # load_only excludes large unused columns (embedding ~3KB/row, narrative_dna).
     ids = [row.id for row in rows]
     score_by_id = {row.id: float(row.score) for row in rows}
 
-    films = db.query(Media).filter(Media.id.in_(ids)).all()
+    films = (
+        db.query(Media)
+        .filter(Media.id.in_(ids))
+        .options(load_only(
+            Media.id,
+            Media.tmdb_id,
+            Media.media_type,
+            Media.title,
+            Media.release_date,
+            Media.overview,
+            Media.poster_path,
+            Media.backdrop_path,
+            Media.poster_supabase_url,
+            Media.backdrop_supabase_url,
+            Media.genres,
+            Media.vote_average,
+            Media.vote_count,
+            Media.popularity,
+            Media.original_language,
+            Media.adult,
+            Media.narrative_dna,
+            Media.tone_tags,
+            Media.mood_scores,
+            Media.context_scores,
+            Media.craving_scores,
+            Media.energy_score,
+            Media.complexity_score,
+            Media.darkness_score,
+            Media.is_fully_scored,
+        ))
+        .all()
+    )
     film_by_id = {f.id: f for f in films}
 
     # Return in score-descending order
@@ -162,10 +226,8 @@ def score_films_sql(
         if fid in film_by_id:
             result.append((film_by_id[fid], score_by_id[fid]))
 
-    logger.info(
-        f"score_films_sql: top {len(result)} films for {mood}/{context}/{craving} "
-        f"(best score={result[0][1]:.3f})"
-        if result else
-        f"score_films_sql: 0 results for {mood}/{context}/{craving}"
+    logger.info(f"score_films_sql: {len(result)} results for {mood}/{context}/{craving}")
+    logger.debug(
+        f"score_films_sql: best score={result[0][1]:.3f}" if result else "score_films_sql: empty"
     )
     return result
