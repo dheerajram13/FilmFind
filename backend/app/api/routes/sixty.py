@@ -32,6 +32,7 @@ from app.core.scoring import (
 from app.db.sessions import log_sixty_session, update_sixty_action
 from app.models.media import Media
 from app.schemas.movie import MovieResponse
+from app.services.film_admin_service import sixty_cache_key
 from app.services.sixty_scorer import score_films_sql
 from app.services.sixty_why import generate_why_reasons
 from app.utils.logger import get_logger
@@ -98,10 +99,6 @@ class SixtyActionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _cache_key(mood: str, context: str, craving: str) -> str:
-    return f"sixty:{mood}:{context}:{craving}"
-
-
 def _load_candidates_from_cache(
     db: Session, mood: str, context: str, craving: str
 ) -> list[tuple[Media, float]] | None:
@@ -110,7 +107,7 @@ def _load_candidates_from_cache(
     Fetches ORM objects fresh from DB so they're attached to the current session.
     """
     cache = get_cache_manager()
-    key = _cache_key(mood, context, craving)
+    key = sixty_cache_key(mood, context, craving)
     cached = cache.get(key)
     if cached is None:
         return None
@@ -130,7 +127,7 @@ def _store_candidates_in_cache(
 ) -> None:
     """Persist top-10 (film_id, score) pairs to Redis."""
     cache = get_cache_manager()
-    key = _cache_key(mood, context, craving)
+    key = sixty_cache_key(mood, context, craving)
     payload = [{"id": f.id, "score": s} for f, s in scored]
     cache.set(key, payload, ttl=_SIXTY_CACHE_TTL)
 

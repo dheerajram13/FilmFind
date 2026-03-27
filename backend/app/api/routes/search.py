@@ -27,7 +27,13 @@ from app.api.constants import (
     RETRIEVAL_MULTIPLIER,
     SIMILAR_MOVIES_BUFFER,
 )
-from app.api.dependencies import DatabaseSession, PaginationParams, make_rate_limit_dependency
+from app.api.dependencies import (
+    DatabaseSession,
+    PaginationParams,
+    get_constraint_validator,
+    get_filter_engine,
+    make_rate_limit_dependency,
+)
 from app.core.config import settings
 from app.api.exceptions import ValidationException
 from app.core.cache_strategies import (
@@ -188,7 +194,7 @@ async def search_movies(
         ) from exc
 
     # Merge request filters with parsed constraints
-    merged_constraints = _merge_constraints(query_intent, request.filters)
+    merged_constraints = query_intent.constraints.merge_with_filters(request.filters)
 
     # Step 2: Validate and normalize constraints
     try:
@@ -466,7 +472,7 @@ async def filter_movies(
         return cached_result
 
     # Convert SearchFilters to QueryConstraints
-    constraints = _convert_filters_to_constraints(filters)
+    constraints = QueryConstraints.from_search_filters(filters)
 
     # Validate constraints
     try:
@@ -574,91 +580,3 @@ async def record_search_click(
     await update_search_click(db=db, session_id=session_id, film_id=request.film_id)
 
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def _convert_filters_to_constraints(filters: SearchFilters) -> QueryConstraints:
-    """
-    Convert SearchFilters to QueryConstraints.
-
-    Args:
-        filters: Search filter schema
-
-    Returns:
-        QueryConstraints schema
-    """
-    from app.schemas.query import MediaType as _MediaType
-    media_type = _MediaType.BOTH
-    if filters.media_type is not None:
-        try:
-            media_type = _MediaType(filters.media_type)
-        except ValueError:
-            media_type = _MediaType.BOTH
-
-    return QueryConstraints(
-        media_type=media_type,
-        year_min=filters.year_min,
-        year_max=filters.year_max,
-        rating_min=filters.rating_min,
-        runtime_min=filters.runtime_min,
-        runtime_max=filters.runtime_max,
-        genres=filters.genres or [],
-        languages=[filters.language] if filters.language else [],
-        adult_content=not filters.exclude_adult,
-        streaming_providers=filters.streaming_providers or [],
-    )
-
-
-def _merge_constraints(parsed_query: ParsedQuery, filters: SearchFilters | None) -> QueryConstraints:
-    """
-    Merge query-parsed constraints with explicit filter constraints.
-
-    Explicit filters take precedence over parsed constraints.
-
-    Args:
-        parsed_query: Parsed query with intent and constraints
-        filters: Explicit filter constraints from request
-
-    Returns:
-        Merged constraints
-    """
-    # Start with parsed constraints, but clear genres — genres extracted by LLM are
-    # semantic signals used by the embedding model, not hard filter requirements.
-    # Hard genre filtering is too strict and causes 0 results (e.g. requiring Drama AND
-    # Mystery AND Thriller simultaneously). Genres are only hard-filtered when the user
-    # explicitly provides them via request.filters.
-    merged_constraints = parsed_query.constraints.copy(deep=True)
-    merged_constraints.genres = []
-
-    if not filters:
-        return merged_constraints
-
-    # Override with explicit filters
-    if filters.year_min is not None:
-        merged_constraints.year_min = filters.year_min
-    if filters.year_max is not None:
-        merged_constraints.year_max = filters.year_max
-    if filters.rating_min is not None:
-        merged_constraints.rating_min = filters.rating_min
-    if filters.runtime_min is not None:
-        merged_constraints.runtime_min = filters.runtime_min
-    if filters.runtime_max is not None:
-        merged_constraints.runtime_max = filters.runtime_max
-    if filters.genres:
-        merged_constraints.genres = filters.genres
-    if filters.language:
-        merged_constraints.languages = [filters.language]
-    if filters.exclude_adult is not None:
-        merged_constraints.adult_content = not filters.exclude_adult
-    if filters.streaming_providers:
-        merged_constraints.streaming_providers = filters.streaming_providers
-    if filters.media_type is not None:
-        from app.schemas.query import MediaType as _MediaType
-        try:
-            merged_constraints.media_type = _MediaType(filters.media_type)
-        except ValueError:
-            pass  # ignore invalid values, keep LLM-parsed media_type
-
-    return merged_constraints

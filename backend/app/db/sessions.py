@@ -21,13 +21,13 @@ from app.models.session import SearchSession, SixtySession
 
 async def _write_search_session(
     db: Session,
+    session_id: str,
     query_text: str,
     query_parsed: dict,
     results: list,
     session_token: str,
     response_ms: int,
-) -> str:
-    session_id = str(uuid.uuid4())
+) -> None:
     try:
         record = SearchSession(
             id=session_id,
@@ -46,7 +46,6 @@ async def _write_search_session(
             db.rollback()
         except Exception:
             pass
-    return session_id
 
 
 def log_search_session(
@@ -60,11 +59,11 @@ def log_search_session(
     """
     Fire-and-forget: log a search session.
 
-    Returns the session_id immediately (before write completes).
+    Returns the session_id that will be written to the database.
     """
     session_id = str(uuid.uuid4())
     asyncio.create_task(
-        _write_search_session(db, query_text, query_parsed, results, session_token, response_ms)
+        _write_search_session(db, session_id, query_text, query_parsed, results, session_token, response_ms)
     )
     return session_id
 
@@ -91,6 +90,7 @@ async def update_search_click(db: Session, session_id: str, film_id: int) -> Non
 
 async def _write_sixty_session(
     db: Session,
+    session_id: str,
     mood: str,
     context: str,
     craving: str,
@@ -98,8 +98,7 @@ async def _write_sixty_session(
     match_score: int,
     seconds_taken: int,
     session_token: str,
-) -> str:
-    session_id = str(uuid.uuid4())
+) -> None:
     try:
         record = SixtySession(
             id=session_id,
@@ -120,7 +119,6 @@ async def _write_sixty_session(
             db.rollback()
         except Exception:
             pass
-    return session_id
 
 
 def log_sixty_session(
@@ -136,12 +134,12 @@ def log_sixty_session(
     """
     Fire-and-forget: log a 60-second mode session.
 
-    Returns a session_id immediately.
+    Returns the session_id that will be written to the database.
     """
     session_id = str(uuid.uuid4())
     asyncio.create_task(
         _write_sixty_session(
-            db, mood, context, craving, film_id, match_score, seconds_taken, session_token
+            db, session_id, mood, context, craving, film_id, match_score, seconds_taken, session_token
         )
     )
     return session_id

@@ -5,10 +5,16 @@ This module defines Pydantic models for representing parsed query information,
 including intents, constraints, themes, tones, and reference titles.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, field_validator
+
+if TYPE_CHECKING:
+    from app.schemas.search import SearchFilters
 
 
 class MediaType(str, Enum):
@@ -100,6 +106,71 @@ class QueryConstraints(BaseModel):
 
     class Config:
         use_enum_values = True
+
+    @classmethod
+    def from_search_filters(cls, filters: SearchFilters) -> QueryConstraints:
+        """Build a QueryConstraints from explicit SearchFilters."""
+        media_type = MediaType.BOTH
+        if filters.media_type is not None:
+            try:
+                media_type = MediaType(filters.media_type)
+            except ValueError:
+                media_type = MediaType.BOTH
+
+        return cls(
+            media_type=media_type,
+            year_min=filters.year_min,
+            year_max=filters.year_max,
+            rating_min=filters.rating_min,
+            runtime_min=filters.runtime_min,
+            runtime_max=filters.runtime_max,
+            genres=filters.genres or [],
+            languages=[filters.language] if filters.language else [],
+            adult_content=not filters.exclude_adult,
+            streaming_providers=filters.streaming_providers or [],
+        )
+
+    def merge_with_filters(self, filters: SearchFilters | None) -> QueryConstraints:
+        """
+        Return a new QueryConstraints that overlays explicit filters on top of self.
+
+        Genres extracted by the LLM are cleared from the base because they are
+        semantic signals for the embedding model, not hard filter requirements.
+        Explicit filters (from request.filters) always win.
+        """
+        # Start from a copy with genres cleared — LLM-extracted genres are not
+        # hard filters; forcing them causes 0-result searches.
+        merged = self.model_copy(deep=True)
+        merged.genres = []
+
+        if not filters:
+            return merged
+
+        if filters.year_min is not None:
+            merged.year_min = filters.year_min
+        if filters.year_max is not None:
+            merged.year_max = filters.year_max
+        if filters.rating_min is not None:
+            merged.rating_min = filters.rating_min
+        if filters.runtime_min is not None:
+            merged.runtime_min = filters.runtime_min
+        if filters.runtime_max is not None:
+            merged.runtime_max = filters.runtime_max
+        if filters.genres:
+            merged.genres = filters.genres
+        if filters.language:
+            merged.languages = [filters.language]
+        if filters.exclude_adult is not None:
+            merged.adult_content = not filters.exclude_adult
+        if filters.streaming_providers:
+            merged.streaming_providers = filters.streaming_providers
+        if filters.media_type is not None:
+            try:
+                merged.media_type = MediaType(filters.media_type)
+            except ValueError:
+                pass  # keep LLM-parsed media_type
+
+        return merged
 
 
 class QueryIntent(BaseModel):

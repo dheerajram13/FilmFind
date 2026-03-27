@@ -19,6 +19,7 @@ import logging
 import math
 from typing import Any
 
+from app.core.config import settings
 from app.schemas.query import ParsedQuery
 from app.services.signal_extractors import SignalExtractor, SignalExtractorFactory
 
@@ -42,25 +43,12 @@ class ScoringWeights:
 
     def __init__(
         self,
-        semantic_similarity: float = 0.5,
-        genre_keyword_match: float = 0.2,
-        popularity: float = 0.1,
-        rating_quality: float = 0.1,
-        recency: float = 0.1,
+        semantic_similarity: float = settings.WEIGHT_SEMANTIC,
+        genre_keyword_match: float = settings.WEIGHT_GENRE,
+        popularity: float = settings.WEIGHT_POPULARITY,
+        rating_quality: float = settings.WEIGHT_RATING,
+        recency: float = settings.WEIGHT_RECENCY,
     ) -> None:
-        """
-        Initialize scoring weights.
-
-        Default weights prioritize semantic similarity while
-        considering genre match, popularity, ratings, and recency.
-
-        Args:
-            semantic_similarity: Weight for semantic vector similarity (default: 0.5)
-            genre_keyword_match: Weight for genre/keyword matches (default: 0.2)
-            popularity: Weight for popularity score (default: 0.1)
-            rating_quality: Weight for rating quality (default: 0.1)
-            recency: Weight for recency boost (default: 0.1)
-        """
         self.semantic_similarity = semantic_similarity
         self.genre_keyword_match = genre_keyword_match
         self.popularity = popularity
