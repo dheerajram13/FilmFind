@@ -109,16 +109,6 @@ def get_reranker() -> LLMReRanker:
     return LLMReRanker()
 
 
-def get_filter_engine() -> FilterEngine:
-    """Dependency for filter engine."""
-    return FilterEngine()
-
-
-def get_constraint_validator() -> ConstraintValidator:
-    """Dependency for constraint validator."""
-    return ConstraintValidator()
-
-
 # =============================================================================
 # Search Endpoints
 # =============================================================================
