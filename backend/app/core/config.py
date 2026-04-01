@@ -3,7 +3,7 @@ Configuration management for FilmFind backend
 """
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -133,6 +133,24 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/filmfind.log"
+
+    @model_validator(mode="after")
+    def validate_required_for_production(self) -> "Settings":
+        """Fail fast on missing critical config when not in debug/dev mode."""
+        if not self.DEBUG:
+            missing = []
+            if not self.DATABASE_URL or self.DATABASE_URL == "postgresql://postgres:postgres@localhost:5432/filmfind":
+                missing.append("DATABASE_URL")
+            if not self.TMDB_API_KEY:
+                missing.append("TMDB_API_KEY")
+            if not (self.GEMINI_API_KEY or self.GROQ_API_KEY):
+                missing.append("GEMINI_API_KEY or GROQ_API_KEY (at least one LLM key required)")
+            if missing:
+                raise ValueError(
+                    f"Missing required environment variables for production: {', '.join(missing)}. "
+                    "Set DEBUG=true to bypass this check in development."
+                )
+        return self
 
     class Config:
         env_file = ".env"

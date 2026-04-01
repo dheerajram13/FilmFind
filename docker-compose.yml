@@ -74,7 +74,7 @@ services:
         echo 'Running migrations against Supabase...' &&
         alembic upgrade head &&
         echo 'Starting server...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 $([ "${ENVIRONMENT:-development}" = "development" ] && echo "--reload")
       "
 
   # Frontend (Next.js)
