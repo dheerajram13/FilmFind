@@ -36,7 +36,8 @@ logger = get_logger(__name__)
 
 # Number of scored candidates returned from the DB (weighted_random_top3 picks 1)
 _TOP_K = 10
-assert isinstance(_TOP_K, int) and 1 <= _TOP_K <= 100, "Invalid _TOP_K"
+if not (isinstance(_TOP_K, int) and 1 <= _TOP_K <= 100):
+    raise ValueError(f"Invalid _TOP_K value: {_TOP_K!r}")
 
 # Whitelist of allowed mood score keys — guards the f-string SQL fragment
 _ALLOWED_MOOD_KEYS: frozenset[str] = frozenset(_MOOD_SCORE_KEYS)
@@ -48,7 +49,6 @@ def score_films_sql(
     context: str,
     craving: str,
     excluded_film_ids: list[int] | None = None,
-    user_id: str | None = None,
 ) -> list[tuple[Media, float]]:
     """
     Score all fully-enriched films in Postgres and return the top _TOP_K.
@@ -59,8 +59,6 @@ def score_films_sql(
         context: Validated context string (e.g. "solo-night").
         craving: Validated craving string (e.g. "laugh").
         excluded_film_ids: Film IDs to exclude (e.g. already seen this session).
-        user_id: If provided, exclude films marked watched by this user.
-
     Returns:
         List of (Media, score) tuples ordered by score descending, length ≤ _TOP_K.
         Returns [] if no enriched films exist.
@@ -106,8 +104,6 @@ def score_films_sql(
         # Exclusion lists
         "excluded_ids": excluded_film_ids or [],
         "no_exclusions": not bool(excluded_film_ids),
-        "user_id": user_id or "",
-        "no_user": user_id is None,
     }
     # Add one param per mood key
     for k in _MOOD_SCORE_KEYS:
@@ -164,13 +160,6 @@ def score_films_sql(
             AND is_fully_scored = TRUE
             AND COALESCE(darkness_score, 5) <= :max_dark
             AND (:no_exclusions OR id != ALL(:excluded_ids))
-            AND (
-                :no_user
-                -- user_watched table added when auth is implemented
-                OR id NOT IN (
-                    SELECT film_id FROM user_watched WHERE user_id = :user_id
-                )
-            )
         ORDER BY score DESC
         LIMIT {_TOP_K}
     """)

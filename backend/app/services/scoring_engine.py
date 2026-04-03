@@ -43,17 +43,17 @@ class ScoringWeights:
 
     def __init__(
         self,
-        semantic_similarity: float = settings.WEIGHT_SEMANTIC,
-        genre_keyword_match: float = settings.WEIGHT_GENRE,
-        popularity: float = settings.WEIGHT_POPULARITY,
-        rating_quality: float = settings.WEIGHT_RATING,
-        recency: float = settings.WEIGHT_RECENCY,
+        semantic_similarity: float | None = None,
+        genre_keyword_match: float | None = None,
+        popularity: float | None = None,
+        rating_quality: float | None = None,
+        recency: float | None = None,
     ) -> None:
-        self.semantic_similarity = semantic_similarity
-        self.genre_keyword_match = genre_keyword_match
-        self.popularity = popularity
-        self.rating_quality = rating_quality
-        self.recency = recency
+        self.semantic_similarity = semantic_similarity if semantic_similarity is not None else settings.WEIGHT_SEMANTIC
+        self.genre_keyword_match = genre_keyword_match if genre_keyword_match is not None else settings.WEIGHT_GENRE
+        self.popularity = popularity if popularity is not None else settings.WEIGHT_POPULARITY
+        self.rating_quality = rating_quality if rating_quality is not None else settings.WEIGHT_RATING
+        self.recency = recency if recency is not None else settings.WEIGHT_RECENCY
 
     def get_total_weight(self) -> float:
         """Calculate total weight (should ideally be 1.0)."""

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.cache_manager import get_cache_manager
 from app.core.scoring import VALID_CONTEXTS, VALID_CRAVINGS, VALID_MOODS
 from app.models.media import Media
+from app.services.embedding_service import EmbeddingService
 from app.services.llm_client import LLMClient
 from app.services.sixty_scorer import score_films_sql
 from app.utils.logger import get_logger
@@ -100,8 +101,6 @@ class EmbeddingRegenerationService:
 
         Returns the embedding dimension.
         """
-        from app.services.embedding_service import EmbeddingService
-
         svc = EmbeddingService()
         genre_names = " ".join(g.name for g in (film.genres or []))
         text = f"{film.title} {film.overview or ''} {genre_names}".strip()
@@ -119,10 +118,11 @@ def sixty_cache_key(mood: str, context: str, craving: str) -> str:
     return f"sixty:{mood}:{context}:{craving}"
 
 
+_SIXTY_CACHE_TTL = 86400  # 24 hours — single source of truth for sixty-mode cache lifetime
+
+
 class SixtyRefreshService:
     """Busts and rebuilds Redis cache for all mood×context×craving combinations."""
-
-    _SIXTY_CACHE_TTL = 86400  # 24 hours
 
     def refresh(self, db: Session) -> dict:
         """
@@ -145,7 +145,7 @@ class SixtyRefreshService:
                         if scored:
                             key = sixty_cache_key(mood, context, craving)
                             payload = [{"id": f.id, "score": s} for f, s in scored]
-                            cache.set(key, payload, ttl=self._SIXTY_CACHE_TTL)
+                            cache.set(key, payload, ttl=_SIXTY_CACHE_TTL)
                             cached += 1
                         else:
                             skipped += 1
