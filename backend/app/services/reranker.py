@@ -197,7 +197,7 @@ Important:
             keyword_names = [k.get("name") if isinstance(k, dict) else str(k) for k in keywords[:5]]
 
             # Get cast (if available)
-            cast = movie.get("cast_members", [])
+            cast = movie.get("cast", [])
             cast_names = [c.get("name") if isinstance(c, dict) else str(c) for c in cast[:5]]
 
             # Get ratings
@@ -218,7 +218,9 @@ Important:
             if cast_names:
                 lines.append(f"    Cast: {', '.join(cast_names)}")
             lines.append(f"    Rating: {rating}/10, Popularity: {popularity}")
-            lines.append(f"    Scores: Similarity={similarity:.3f}, Final={final_score:.3f}")
+            sim_str = f"{similarity:.3f}" if isinstance(similarity, (int, float)) else str(similarity)
+            fin_str = f"{final_score:.3f}" if isinstance(final_score, (int, float)) else str(final_score)
+            lines.append(f"    Scores: Similarity={sim_str}, Final={fin_str}")
             lines.append("")
 
         return "\n".join(lines)

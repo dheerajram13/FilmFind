@@ -183,7 +183,7 @@ async def sixty_pick(
 
     # Weighted random pick from top 3 (with noise for variety)
     selected_film: Media = weighted_random_top3(scored)
-    best_score = next(s for f, s in scored if f.id == selected_film.id)
+    best_score = next((s for f, s in scored if f.id == selected_film.id), 0.0)
     match_score = match_score_to_percent(best_score)
 
     # Generate personalised why-reasons
