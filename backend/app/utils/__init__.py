@@ -7,7 +7,6 @@ from app.utils.json_utils import (
 )
 from app.utils.logger import get_logger, setup_logger
 from app.utils.math_utils import clamp, log_normalize, normalize_to_range, sigmoid
-from app.utils.rate_limiter import RateLimiter
 from app.utils.retry import retry_with_backoff
 from app.utils.stats_utils import calculate_mean, calculate_median, calculate_percentile
 from app.utils.string_utils import (
@@ -19,7 +18,6 @@ from app.utils.string_utils import (
 
 
 __all__ = [
-    "RateLimiter",
     "setup_logger",
     "get_logger",
     "retry_with_backoff",

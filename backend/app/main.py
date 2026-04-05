@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.api.middleware import (
+from app.core.middleware import (
     ErrorHandlingMiddleware,
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,

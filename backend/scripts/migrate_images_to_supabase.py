@@ -33,7 +33,7 @@ from sqlalchemy import text
 from tqdm import tqdm
 
 from app.core.database import SessionLocal
-from app.services.supabase_storage import SupabaseStorageService
+from app.core.storage import SupabaseStorageService
 
 
 def parse_args() -> argparse.Namespace:

@@ -58,11 +58,11 @@ from app.utils.movie_mapper import (
     movies_to_responses,
     movies_to_search_results,
 )
-from app.utils.movie_repository import (
+from app.repositories.query_utils import (
     get_all_movies,
     get_movie_by_id,
 )
-from app.utils.movie_repository import (
+from app.repositories.query_utils import (
     get_trending_movies as fetch_trending_movies,
 )
 from app.db.sessions import log_search_session, update_search_click

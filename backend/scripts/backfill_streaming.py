@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.media import Media
-from app.services.TMDB.tmdb_client import TMDBAPIClient
+from app.services.tmdb.tmdb_client import TMDBAPIClient
 
 # Regions to fetch — default is just the configured region.
 # Pass --all-regions to fetch a broader set.

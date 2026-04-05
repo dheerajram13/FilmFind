@@ -28,8 +28,8 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
-from app.services.TMDB.tmdb_service import TMDBService
-from app.services.supabase_storage import SupabaseStorageService
+from app.services.tmdb.tmdb_service import TMDBService
+from app.core.storage import SupabaseStorageService
 
 # TMDB rate limit: 40 req / 10 s → ~0.25 s/req safe floor
 RATE_DELAY = 0.3

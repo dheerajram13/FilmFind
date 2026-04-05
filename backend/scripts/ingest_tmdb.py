@@ -59,7 +59,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import settings
-from app.services.TMDB.tmdb_service import TMDBService
+from app.services.tmdb.tmdb_service import TMDBService
 
 
 class TMDBDataIngester:

@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.media import Movie, TVShow, Genre, Keyword, Cast
-from app.services.TMDB.tmdb_service import TMDBService
+from app.services.tmdb.tmdb_service import TMDBService
 
 
 def ingest_tv_shows_to_db(max_pages: int = 10):

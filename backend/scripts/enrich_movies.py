@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.media import Cast, Genre, Keyword, Movie, media_genres
-from app.services.TMDB.tmdb_service import TMDBService
+from app.services.tmdb.tmdb_service import TMDBService
 
 
 def enrich_movies():
