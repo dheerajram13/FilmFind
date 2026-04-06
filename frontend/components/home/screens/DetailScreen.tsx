@@ -48,7 +48,7 @@ export function DetailScreen({
   const reasons = detailWhyCards(detailMovie, submittedQuery);
   const streams = detailStreamingOptions(detailMovie, selectedStreaming);
   const primaryStream = streams[0]?.name ?? "Netflix";
-  const genres = detailMovie.genres.slice(0, 3).map((g) => g.name);
+  const genres = (detailMovie.genres ?? []).slice(0, 3).map((g) => g.name);
 
   return (
     <>

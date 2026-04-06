@@ -334,7 +334,7 @@ async function resolveMovieSixtyPick(
     const query = buildModeQuery(moodKey, contextKey, cravingKey);
     try {
       const searchResponse = await apiClient.search(query, undefined, 12);
-      const film: Movie | undefined = searchResponse.results[0];
+      const film: Movie | undefined = searchResponse.results?.[0];
       if (film) {
         const mood = optionFor(MOOD_OPTIONS, moodKey, MOOD_FALLBACK);
         const context = optionFor(CONTEXT_OPTIONS, contextKey, CONTEXT_FALLBACK);
