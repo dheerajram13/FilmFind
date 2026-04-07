@@ -51,10 +51,17 @@ export function useFilters(results: MovieSearchResult[]): UseFiltersReturn {
         selectedStreaming.length === 0 ||
         providerNames.length === 0 ||
         selectedStreaming.some((s) => providerNames.includes(normalizeProviderName(s)));
+      const allContentTypesSelected = selectedContentTypes.length === CONTENT_TYPE_OPTIONS.length;
+      const contentTypeMatches =
+        allContentTypesSelected ||
+        (selectedContentTypes.includes("Movies") && movie.media_type === "movie") ||
+        (selectedContentTypes.includes("Series") && movie.media_type === "tv") ||
+        (selectedContentTypes.includes("Documentaries") &&
+          movieGenres.includes("documentary"));
 
-      return ratingMatches && yearMatches && genreMatches && streamingMatches;
+      return ratingMatches && yearMatches && genreMatches && streamingMatches && contentTypeMatches;
     });
-  }, [minRating, minYear, results, selectedGenres, selectedStreaming]);
+  }, [minRating, minYear, results, selectedContentTypes, selectedGenres, selectedStreaming]);
 
   const toggleStreaming = (service: string): void => {
     setSelectedStreaming((current) =>

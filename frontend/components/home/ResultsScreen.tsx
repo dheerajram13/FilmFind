@@ -2,8 +2,8 @@
 
 import { type FormEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ResultCard } from "@/components/home/cards/ResultCard";
-import { FiltersSidebar } from "@/components/home/filters/FiltersSidebar";
+import { ResultCard } from "@/components/home/ResultCard";
+import { FiltersSidebar } from "@/components/home/FiltersSidebar";
 import type { MovieSearchResult } from "@/types/api";
 
 interface ResultsScreenProps {

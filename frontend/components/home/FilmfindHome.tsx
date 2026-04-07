@@ -4,9 +4,9 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useSearch } from "@/hooks/useSearch";
 import { useFilters } from "@/hooks/useFilters";
-import { HomeScreen } from "@/components/home/screens/HomeScreen";
-import { ResultsScreen } from "@/components/home/screens/ResultsScreen";
-import { DetailScreen } from "@/components/home/screens/DetailScreen";
+import { HomeScreen } from "@/components/home/HomeScreen";
+import { ResultsScreen } from "@/components/home/ResultsScreen";
+import { DetailScreen } from "@/components/home/DetailScreen";
 
 // Lazy-load: uses window/navigator APIs — not SSR-compatible
 const SixtySecondMode = dynamic(
