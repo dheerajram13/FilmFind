@@ -99,15 +99,17 @@ class Settings(BaseSettings):
     WEIGHT_RATING: float = 0.1
     WEIGHT_RECENCY: float = 0.1
 
-    # CORS
-    CORS_ORIGINS: ClassVar[list] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://frontend.filmfind.orb.local",
-        "https://frontend.filmfind.orb.local",
-        "http://localhost:8000",
-        "https://filmfind.com",
-    ]
+    # CORS — comma-separated list of allowed origins (env: CORS_ORIGINS)
+    # Example: "https://filmfind.vercel.app,https://filmfind.com"
+    CORS_ORIGINS_STR: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        description="Comma-separated list of allowed CORS origins",
+        alias="CORS_ORIGINS",
+    )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS_STR.split(",") if o.strip()]
 
     # Admin
     ADMIN_SECRET: str = Field(default="", description="Bearer token for admin endpoints")

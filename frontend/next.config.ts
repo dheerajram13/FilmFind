@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
+const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : "hmfqdofdkzpphmjxdqgl.supabase.co";
+
 const nextConfig: NextConfig = {
-  /* config options here */
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
@@ -15,13 +18,12 @@ const nextConfig: NextConfig = {
         pathname: "/t/p/**",
       },
       {
-        // Supabase Storage CDN
+        // Supabase Storage CDN — hostname derived from NEXT_PUBLIC_SUPABASE_URL
         protocol: "https",
-        hostname: "hmfqdofdkzpphmjxdqgl.supabase.co",
+        hostname: supabaseHostname,
         pathname: "/storage/v1/object/public/**",
       },
     ],
-    // Disable optimization for TMDB images to avoid timeout issues in Docker
     unoptimized: true,
   },
   env: {

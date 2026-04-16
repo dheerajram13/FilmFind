@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from app.models.movie import Cast, Genre, Keyword, Movie, MovieCast
+from app.models.media import Cast, Genre, Keyword, Movie
 from app.schemas.query import (
     ParsedQuery,
     QueryConstraints,
@@ -91,10 +91,8 @@ def mock_movie_repo():
         cast_member = Mock(spec=Cast)
         cast_member.name = "Actor Name"
 
-        movie_cast = Mock(spec=MovieCast)
-        movie_cast.cast_member = cast_member
-        movie_cast.character_name = "Character"
-        movie_cast.order_position = 0
+        movie_cast = Mock(spec=Cast)
+        movie_cast.name = "Actor Name"
 
         movie.cast_members = [movie_cast]
 

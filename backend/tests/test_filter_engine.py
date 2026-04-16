@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pytest
 
-from app.models.movie import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Movie
 from app.schemas.query import QueryConstraints
 from app.services.filter_engine import FilterEngine, FilterStatistics
 

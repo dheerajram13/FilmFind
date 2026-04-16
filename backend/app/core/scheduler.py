@@ -46,25 +46,6 @@ class JobScheduler:
             return
 
         from app.jobs.embedding_jobs import rebuild_index, regenerate_embeddings
-        from app.jobs.popularity_update import update_popularity_scores
-        from app.jobs.tmdb_sync import sync_tmdb_data
-
-        # Daily jobs (run at 2 AM UTC)
-        self.scheduler.add_job(
-            sync_tmdb_data,
-            trigger=CronTrigger(hour=2, minute=0),
-            id="daily_tmdb_sync",
-            name="Daily TMDB Data Sync",
-            replace_existing=True,
-        )
-
-        self.scheduler.add_job(
-            update_popularity_scores,
-            trigger=CronTrigger(hour=3, minute=0),
-            id="daily_popularity_update",
-            name="Daily Popularity Score Update",
-            replace_existing=True,
-        )
 
         # Weekly jobs (run on Sunday at 4 AM UTC)
         self.scheduler.add_job(
@@ -84,7 +65,7 @@ class JobScheduler:
         )
 
         self._jobs_registered = True
-        logger.info("Registered 4 scheduled jobs")
+        logger.info("Registered 2 scheduled jobs (TMDB sync/popularity jobs not yet implemented)")
 
     def start(self) -> None:
         """Start the scheduler."""

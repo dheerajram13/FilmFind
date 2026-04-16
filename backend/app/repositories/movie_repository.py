@@ -10,7 +10,7 @@ Design Patterns:
 - Lazy/Eager Loading: Optimized relationship loading
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import and_, desc, func, or_
@@ -329,7 +329,7 @@ class MovieRepository(BaseRepository[Movie]):
         """
         from datetime import timedelta
 
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
         filters = [Movie.release_date >= cutoff_date]
         if not include_adult:
             filters.append(Movie.adult == False)  # noqa: E712
@@ -506,7 +506,7 @@ class MovieRepository(BaseRepository[Movie]):
             for key, value in movie_data.items():
                 if hasattr(existing, key) and key != "id":
                     setattr(existing, key, value)
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(UTC)
             self.db.commit()
             self.db.refresh(existing)
             return existing

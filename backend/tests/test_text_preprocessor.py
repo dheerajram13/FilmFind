@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.models.movie import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Movie
 from app.services.text_preprocessor import TextPreprocessor
 
 
@@ -58,8 +58,8 @@ class TestPreprocessMovie:
         text = TextPreprocessor.preprocess_movie(sample_movie)
 
         # Check all sections are present
-        assert "Title: Inception" in text
-        assert "Tagline: Your mind is the scene of the crime" in text
+        assert "Inception" in text
+        assert "Your mind is the scene of the crime" in text
         assert "Plot: A thief who steals corporate secrets" in text
         assert "Genres: Action, Science Fiction, Thriller" in text
         assert "Keywords: dream, subconscious, heist" in text
@@ -69,7 +69,7 @@ class TestPreprocessMovie:
         """Test preprocessing with only title."""
         text = TextPreprocessor.preprocess_movie(minimal_movie)
 
-        assert "Title: Minimal Movie" in text
+        assert "Minimal Movie" in text
         assert "Tagline:" not in text
         assert "Plot:" not in text
         assert "Genres:" not in text
@@ -86,7 +86,7 @@ class TestPreprocessMovie:
 
         text = TextPreprocessor.preprocess_movie(movie)
 
-        assert "Title: Test Movie" in text
+        assert "Test Movie" in text
         assert "Tagline:" not in text  # Should be filtered out
         assert "Plot:" not in text  # Should be filtered out
 

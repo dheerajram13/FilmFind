@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.database import Base
-from app.models.movie import Cast, Genre, Movie
+from app.models.media import Cast, Genre, Movie
 from app.repositories.movie_repository import (
     CastRepository,
     GenreRepository,

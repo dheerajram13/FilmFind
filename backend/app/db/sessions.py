@@ -5,7 +5,7 @@ All writes use asyncio.create_task so they never block the HTTP response.
 """
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -36,7 +36,7 @@ async def _write_search_session(
             query_parsed=query_parsed,
             results=results,
             response_ms=response_ms,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         db.add(record)
         db.commit()
@@ -109,7 +109,7 @@ async def _write_sixty_session(
             film_picked_id=film_id,
             match_score=match_score,
             seconds_taken=seconds_taken,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         db.add(record)
         db.commit()

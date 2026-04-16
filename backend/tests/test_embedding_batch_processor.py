@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from app.models.movie import Genre, Movie
+from app.models.media import Genre, Movie
 from app.repositories.movie_repository import MovieRepository
 from app.services.embedding_batch_processor import EmbeddingBatchProcessor
 
