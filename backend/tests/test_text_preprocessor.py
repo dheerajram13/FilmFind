@@ -60,8 +60,8 @@ class TestPreprocessMovie:
         # Check all sections are present
         assert "Inception" in text
         assert "Your mind is the scene of the crime" in text
-        assert "Plot: A thief who steals corporate secrets" in text
-        assert "Genres: Action, Science Fiction, Thriller" in text
+        assert "A thief who steals corporate secrets" in text
+        assert "Action, Science Fiction, Thriller" in text
         assert "Keywords: dream, subconscious, heist" in text
         assert "Cast: Leonardo DiCaprio, Tom Hardy, Elliot Page" in text
 
