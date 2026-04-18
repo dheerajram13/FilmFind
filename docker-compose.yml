@@ -25,7 +25,7 @@ services:
       - "8000:8000"
     environment:
       # Database — Supabase (set SUPABASE_DB_URL in .env)
-      DATABASE_URL: ${SUPABASE_DB_URL}
+      DATABASE_URL: ${DATABASE_URL}
 
       # Supabase API
       SUPABASE_URL: ${SUPABASE_URL}
