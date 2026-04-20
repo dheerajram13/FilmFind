@@ -82,7 +82,7 @@ export function buildReasons(movie: MovieSearchResult, query: string): string[] 
 
   const genre = primaryGenre(movie);
   reasons.push(`Strong ${genre.toLowerCase()} alignment with your query intent.`);
-  reasons.push(`Critically rated ${movie.vote_average.toFixed(1)} with high audience pull.`);
+  reasons.push(`Critically rated ${(movie.vote_average ?? 0).toFixed(1)} with high audience pull.`);
 
   if (query.toLowerCase().includes("thriller")) {
     reasons[1] = "Psychological tension and pacing closely match your thriller request.";
