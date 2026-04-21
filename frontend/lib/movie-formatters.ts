@@ -54,16 +54,6 @@ export function primaryGenre(movie: MovieSearchResult | Movie): string {
   return movie.genres[0]?.name ?? "Drama";
 }
 
-export function genreEmoji(movie: Movie | MovieSearchResult): string {
-  const first = movie.genres[0]?.name.toLowerCase() ?? "";
-  if (first.includes("drama")) return "🎭";
-  if (first.includes("thriller")) return "🔍";
-  if (first.includes("sci")) return "🛸";
-  if (first.includes("horror")) return "🪦";
-  if (first.includes("comedy")) return "😂";
-  if (first.includes("animation")) return "🧠";
-  return "🎬";
-}
 
 export function pickWatchLabel(movie: MovieSearchResult, selectedStreaming: string[]): string {
   const providers = getProviderNames(movie).map(normalizeProviderName);
