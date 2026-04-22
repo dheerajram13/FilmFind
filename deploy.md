@@ -174,10 +174,10 @@ curl -X POST $BACKEND/api/sixty/pick \
 - [ ] Run enrichment pipeline to score more films for sixty-mode:
   ```bash
   # On HF Space terminal or locally against Supabase:
-  docker compose exec backend python scripts/generate_embeddings.py
-  docker compose exec backend python scripts/build_index.py
+  docker compose exec backend python scripts/ml/generate_embeddings.py
+  docker compose exec backend python scripts/ml/build_index.py
   # LLM enrichment (rate-limited to 1500/day on Gemini free tier):
-  docker compose exec backend python scripts/score_films.py
+  docker compose exec backend python scripts/ml/score_films.py
   ```
 
 ---
