@@ -191,17 +191,6 @@ def sanitise_query(query: str) -> str:
     return query.strip()
 
 
-# Keep the old no-op name as an alias so existing imports don't break
-async def check_rate_limit(
-    request_id: str | None = Header(None, alias="X-Request-ID"),
-    client_ip: str | None = Header(None, alias="X-Forwarded-For"),
-) -> None:
-    if request_id:
-        logger.debug(f"Request ID: {request_id}")
-    if client_ip:
-        logger.debug(f"Client IP: {client_ip}")
-
-
 # =============================================================================
 # Pagination Dependencies
 # =============================================================================
