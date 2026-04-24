@@ -68,7 +68,7 @@ def log_search_session(
     return session_id
 
 
-async def update_search_click(db: Session, session_id: str, film_id: int) -> None:
+def update_search_click(db: Session, session_id: str, film_id: int) -> None:
     """Mark which result was clicked."""
     try:
         record = db.query(SearchSession).filter(SearchSession.id == session_id).first()
@@ -145,7 +145,7 @@ def log_sixty_session(
     return session_id
 
 
-async def update_sixty_action(
+def update_sixty_action(
     db: Session,
     session_id: str,
     watch: bool = False,

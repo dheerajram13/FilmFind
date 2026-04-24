@@ -165,7 +165,7 @@ async def search_movies(
         )
 
     # Check cache first
-    filters_dict = request.filters.dict(exclude_none=True) if request.filters else None
+    filters_dict = request.filters.model_dump(exclude_none=True) if request.filters else None
     cached_result = cache.get(request.query, filters_dict, request.limit)
     if cached_result:
         logger.info("Returning cached search results")
@@ -174,7 +174,7 @@ async def search_movies(
     # Step 1: Parse query to extract intent
     try:
         query_intent = query_parser.parse(request.query)
-        logger.info(f"Parsed intent: {query_intent.dict()}")
+        logger.info(f"Parsed intent: {query_intent.model_dump()}")
     except Exception as exc:
         logger.error(f"Query parsing failed: {exc}")
         msg = f"Failed to parse query: {exc!s}"
@@ -189,12 +189,12 @@ async def search_movies(
     # Step 2: Validate and normalize constraints
     try:
         validated_constraints = validator.validate(merged_constraints)
-        logger.info(f"Validated constraints: {validated_constraints.dict()}")
+        logger.info(f"Validated constraints: {validated_constraints.model_dump()}")
     except ValueError as exc:
         msg = f"Invalid constraints: {exc!s}"
         raise ValidationException(
             msg,
-            details={"constraints": merged_constraints.dict()},
+            details={"constraints": merged_constraints.model_dump()},
         ) from exc
 
     # Step 3: Retrieve candidates using semantic search
@@ -277,7 +277,7 @@ async def search_movies(
     )
 
     # Cache the response
-    cache.set(request.query, response.dict(), filters_dict, request.limit)
+    cache.set(request.query, response.model_dump(), filters_dict, request.limit)
 
     # Fire-and-forget session logging
     _response_ms = int(time.time() * 1000) - _start_ms
@@ -286,8 +286,8 @@ async def search_movies(
         log_search_session(
             db=db,
             query_text=request.query,
-            query_parsed=query_intent.dict() if query_intent else {},
-            results=[r.dict() for r in results[:10]],
+            query_parsed=query_intent.model_dump() if query_intent else {},
+            results=[r.model_dump() for r in results[:10]],
             session_token=_session_token,
             response_ms=_response_ms,
         )
@@ -328,7 +328,7 @@ async def get_movie_details(
     response = movie_to_response(movie)
 
     # Cache the response
-    cache.set(movie_id, response.dict())
+    cache.set(movie_id, response.model_dump())
 
     return response
 
@@ -409,7 +409,7 @@ async def get_similar_movies(
             "id": reference_movie.id,
             "title": reference_movie.title,
         },
-        "similar_movies": [r.dict() for r in results],
+        "similar_movies": [r.model_dump() for r in results],
         "total": len(similar_movies),
     }
 
@@ -450,12 +450,12 @@ async def filter_movies(
     Raises:
         ValidationException: If filters are invalid
     """
-    logger.info(f"Filter request: {filters.dict(exclude_none=True)}")
+    logger.info(f"Filter request: {filters.model_dump(exclude_none=True)}")
 
     # Check cache first
     skip = pagination["skip"]
     limit = pagination["limit"]
-    filters_dict = filters.dict(exclude_none=True)
+    filters_dict = filters.model_dump(exclude_none=True)
     cached_result = cache.get(filters_dict, skip, limit)
     if cached_result:
         logger.info("Returning cached filter results")
@@ -471,7 +471,7 @@ async def filter_movies(
         msg = f"Invalid filters: {exc!s}"
         raise ValidationException(
             msg,
-            details={"filters": filters.dict()},
+            details={"filters": filters.model_dump()},
         ) from exc
 
     # Get all movies from database
@@ -490,9 +490,9 @@ async def filter_movies(
 
     # Serialize for cache
     cached_response = {
-        "movies": [r.dict() for r in results],
+        "movies": [r.model_dump() for r in results],
         "total": len(filtered_movies),
-        "filters_applied": validated_constraints.dict(exclude_none=True),
+        "filters_applied": validated_constraints.model_dump(exclude_none=True),
     }
 
     # Cache the serialized response
@@ -501,7 +501,7 @@ async def filter_movies(
     return {
         "movies": results,
         "total": len(filtered_movies),
-        "filters_applied": validated_constraints.dict(exclude_none=True),
+        "filters_applied": validated_constraints.model_dump(exclude_none=True),
     }
 
 
@@ -538,7 +538,7 @@ async def get_trending_movies(
 
     # Serialize for cache
     cached_response = {
-        "movies": [r.dict() for r in results],
+        "movies": [r.model_dump() for r in results],
         "total": total,
     }
 
@@ -567,6 +567,6 @@ async def record_search_click(
     db: DatabaseSession,
 ) -> None:
     """Record which search result was clicked."""
-    await update_search_click(db=db, session_id=session_id, film_id=request.film_id)
+    update_search_click(db=db, session_id=session_id, film_id=request.film_id)
 
 

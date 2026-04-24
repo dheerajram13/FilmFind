@@ -46,10 +46,11 @@ async def enrich_film(film_id: int, db: DatabaseSession) -> dict:
         result = FilmEnrichmentService().enrich(db, film)
         return {"film_id": film_id, "title": film.title, "status": "enriched", **result}
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.warning(f"Admin enrich validation error for film {film_id}: {exc}")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enrichment validation failed")
     except Exception as exc:
         logger.error(f"Admin enrich failed for film {film_id}: {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Enrichment failed")
 
 
 @router.post(
@@ -68,7 +69,7 @@ async def regenerate_embedding(film_id: int, db: DatabaseSession) -> dict:
         return {"film_id": film_id, "title": film.title, "dim": dim, "status": "embedded"}
     except Exception as exc:
         logger.error(f"Admin embed failed for film {film_id}: {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Embedding regeneration failed")
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +145,9 @@ async def analytics_sixty(db: DatabaseSession) -> dict:
             .all()
         )
 
-    watch_count = db.query(func.count(SixtySession.id)).filter(SixtySession.watch_clicked == True).scalar() or 0  # noqa: E712
-    share_count = db.query(func.count(SixtySession.id)).filter(SixtySession.share_clicked == True).scalar() or 0  # noqa: E712
-    retry_count = db.query(func.count(SixtySession.id)).filter(SixtySession.retry_clicked == True).scalar() or 0  # noqa: E712
+    watch_count = db.query(func.count(SixtySession.id)).filter(SixtySession.watch_clicked.is_(True)).scalar() or 0
+    share_count = db.query(func.count(SixtySession.id)).filter(SixtySession.share_clicked.is_(True)).scalar() or 0
+    retry_count = db.query(func.count(SixtySession.id)).filter(SixtySession.retry_clicked.is_(True)).scalar() or 0
 
     return {
         "total_sessions": total,

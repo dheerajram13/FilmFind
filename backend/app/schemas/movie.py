@@ -4,39 +4,36 @@ Movie Pydantic schemas for API requests/responses
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GenreSchema(BaseModel):
     """Genre schema"""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
-
-    class Config:
-        from_attributes = True
 
 
 class KeywordSchema(BaseModel):
     """Keyword schema"""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
-
-    class Config:
-        from_attributes = True
 
 
 class CastSchema(BaseModel):
     """Cast schema"""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     character_name: Optional[str] = None
     profile_path: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class MovieBase(BaseModel):
@@ -56,6 +53,8 @@ class MovieBase(BaseModel):
 class MovieResponse(MovieBase):
     """Movie response schema"""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     tmdb_id: int
     media_type: str = Field(default="movie", description="Media type: 'movie' or 'tv'")
@@ -67,9 +66,6 @@ class MovieResponse(MovieBase):
     cast_members: list[CastSchema] = []
     streaming_providers: Optional[dict] = None
 
-    class Config:
-        from_attributes = True
-
 
 class MovieSearchResult(MovieResponse):
     """Movie search result with similarity scores"""
@@ -77,6 +73,3 @@ class MovieSearchResult(MovieResponse):
     similarity_score: float = Field(default=0.0, description="Semantic similarity score")
     relevance_score: Optional[float] = Field(None, description="Final ranking score (alias for final_score)")
     match_explanation: Optional[str] = Field(None, description="Why this movie was recommended")
-
-    class Config:
-        from_attributes = True

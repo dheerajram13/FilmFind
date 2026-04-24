@@ -241,7 +241,7 @@ async def sixty_action(
     db: DatabaseSession,
 ) -> None:
     """Log watch/share/retry click actions on a sixty session."""
-    await update_sixty_action(
+    update_sixty_action(
         db=db,
         session_id=session_id,
         watch=request.watch_clicked,

@@ -23,7 +23,7 @@ def build_query_interpretation(
     """
     interpretation = {
         "raw_query": query_intent.raw_query,
-        "filters_applied": validated_constraints.dict(exclude_none=True),
+        "filters_applied": validated_constraints.model_dump(exclude_none=True),
     }
 
     # Add optional fields if present
@@ -59,5 +59,5 @@ def build_empty_query_interpretation(
     """
     return {
         "raw_query": query_intent.raw_query,
-        "filters_applied": validated_constraints.dict(exclude_none=True),
+        "filters_applied": validated_constraints.model_dump(exclude_none=True),
     }

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 if TYPE_CHECKING:
     from app.schemas.search import SearchFilters
@@ -104,8 +104,7 @@ class QueryConstraints(BaseModel):
     popular_only: bool = Field(default=False, description="Only include popular titles")
     hidden_gems: bool = Field(default=False, description="Focus on lesser-known titles")
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     @classmethod
     def from_search_filters(cls, filters: SearchFilters) -> QueryConstraints:
@@ -176,6 +175,8 @@ class QueryConstraints(BaseModel):
 class QueryIntent(BaseModel):
     """Intent and semantic information extracted from the query"""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     # Core query elements
     raw_query: str = Field(..., description="Original user query")
     themes: list[str] = Field(
@@ -213,12 +214,11 @@ class QueryIntent(BaseModel):
     )
     is_mood_query: bool = Field(default=False, description="Whether query is mood/emotion-based")
 
-    class Config:
-        use_enum_values = True
-
 
 class ParsedQuery(BaseModel):
     """Complete parsed query with intent and constraints"""
+
+    model_config = ConfigDict(use_enum_values=True)
 
     # Core components
     intent: QueryIntent = Field(..., description="Extracted intent and semantic information")
@@ -241,12 +241,11 @@ class ParsedQuery(BaseModel):
         ..., description="Optimized text for embedding generation and semantic search"
     )
 
-    class Config:
-        use_enum_values = True
-
 
 class QueryParserConfig(BaseModel):
     """Configuration for query parser"""
+
+    model_config = ConfigDict(use_enum_values=True)
 
     llm_provider: str = Field(default="gemini", description="LLM provider (gemini, groq, or ollama)")
     enable_fallback: bool = Field(
@@ -256,6 +255,3 @@ class QueryParserConfig(BaseModel):
     timeout: int = Field(default=10, description="Timeout for LLM calls in seconds", ge=1, le=30)
     cache_results: bool = Field(default=True, description="Cache parsing results")
     cache_ttl: int = Field(default=3600, description="Cache TTL in seconds")
-
-    class Config:
-        use_enum_values = True
