@@ -5,11 +5,6 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : "hmfqdofdkzpphmjxdqgl.supabase.co";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: [
-    "localhost",
-    "127.0.0.1",
-    "frontend.filmfind.orb.local",
-  ],
   images: {
     remotePatterns: [
       {
@@ -25,9 +20,6 @@ const nextConfig: NextConfig = {
       },
     ],
     unoptimized: true,
-  },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
   },
 };
 

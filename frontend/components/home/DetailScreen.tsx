@@ -90,10 +90,10 @@ export function DetailScreen({
             </p>
 
             <div className="ff-detail-ctas">
-              <button type="button" className="ff-cta-primary">
+              <button type="button" className="ff-cta-primary" aria-label={`Watch on ${primaryStream}`}>
                 ▶ Watch on {primaryStream}
               </button>
-              <button type="button" className="ff-cta-secondary">
+              <button type="button" className="ff-cta-secondary" aria-label="Save to Watchlist">
                 + Save to Watchlist
               </button>
               <button type="button" className="ff-cta-secondary" onClick={onBackToResults}>
