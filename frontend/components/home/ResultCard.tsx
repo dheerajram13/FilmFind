@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import Image from "next/image";
 import { getBackdropUrl, getPlaceholderImage, getPosterUrl } from "@/lib/image-utils";
 import {
@@ -41,6 +42,14 @@ export function ResultCard({
   const isExpanded = expandedId === movie.id;
   const rankOpacity = Math.max(0.62, 1 - (rank - 1) * 0.08);
   const similarityPct = Math.round((movie.similarity_score ?? 0) * 100);
+
+  const handleOpenDetails = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onOpenDetails(movie);
+    },
+    [movie, onOpenDetails]
+  );
 
   const imageUrl =
     getBackdropUrl(movie.backdrop_path, "w780") ||
@@ -95,16 +104,13 @@ export function ResultCard({
         </div>
 
         <div className="ff-r-actions">
-          <button type="button" className="ff-r-watch">
+          <button type="button" className="ff-r-watch" aria-label={`Watch on ${watchLabel}`}>
             ▶ {watchLabel}
           </button>
           <button
             type="button"
             className="ff-r-more"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDetails(movie);
-            }}
+            onClick={handleOpenDetails}
           >
             Details
           </button>

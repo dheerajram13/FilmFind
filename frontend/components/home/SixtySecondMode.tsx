@@ -477,9 +477,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
   const activeContext = optionFor(CONTEXT_OPTIONS, selectedContext, CONTEXT_FALLBACK);
   const activeCraving = optionFor(CRAVING_OPTIONS, selectedCraving, CRAVING_FALLBACK);
 
-  const ringOffset = useMemo(() => {
-    return ANALYSIS_RING_CIRCUMFERENCE * (1 - analysisCountdown / 3);
-  }, [analysisCountdown]);
+  const ringOffset = ANALYSIS_RING_CIRCUMFERENCE * (1 - analysisCountdown / 3);
 
   const resultPosterUrl = resultMovie
     ? getPosterUrl(resultMovie.poster_path, "w500") ||
