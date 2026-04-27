@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import apiClient from "@/lib/api-client";
 import type { MovieSearchResult } from "@/types/api";
 
@@ -30,6 +30,7 @@ export function useSearch(): UseSearchReturn {
   const [results, setResults] = useState<MovieSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const runSearch = async (nextQuery: string): Promise<void> => {
     const clean = nextQuery.trim();
@@ -37,6 +38,11 @@ export function useSearch(): UseSearchReturn {
       setError("Type at least 3 characters to search.");
       return;
     }
+
+    // Cancel any in-flight search before starting a new one
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setQuery(clean);
     setSubmittedQuery(clean);
@@ -46,9 +52,10 @@ export function useSearch(): UseSearchReturn {
     setSelectedMovie(null);
 
     try {
-      const response = await apiClient.search(clean, undefined, 20);
+      const response = await apiClient.search(clean, undefined, 20, controller.signal);
       setResults(response.results);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setResults([]);
       setError(err instanceof Error ? err.message : "Search failed. Please try again.");
     } finally {

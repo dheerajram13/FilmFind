@@ -36,22 +36,20 @@ export class APIError extends Error {
 }
 
 /**
- * Generic fetch wrapper with error handling
+ * Generic fetch wrapper with error handling and AbortController support
  */
 async function fetchAPI<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  signal?: AbortSignal
 ): Promise<T> {
   const url = `${API_BASE_URL}${API_PREFIX}${endpoint}`;
 
-  const defaultHeaders = {
-    "Content-Type": "application/json",
-  };
-
   const config: RequestInit = {
     ...options,
+    signal,
     headers: {
-      ...defaultHeaders,
+      "Content-Type": "application/json",
       ...options.headers,
     },
   };
@@ -65,18 +63,13 @@ async function fetchAPI<T>(
         (typeof errorData.error === "string" && errorData.error) ||
         (typeof errorData.detail === "string" && errorData.detail) ||
         `API Error: ${response.statusText}`;
-      throw new APIError(
-        response.status,
-        response.statusText,
-        errorMessage
-      );
+      throw new APIError(response.status, response.statusText, errorMessage);
     }
 
     return await response.json();
   } catch (error) {
-    if (error instanceof APIError) {
-      throw error;
-    }
+    if (error instanceof APIError) throw error;
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new Error(`Network error: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
@@ -91,7 +84,8 @@ export const apiClient = {
   search: async (
     query: string,
     filters?: SearchFilters,
-    limit = 10
+    limit = 10,
+    signal?: AbortSignal
   ): Promise<SearchResponse> => {
     const cleanFilters = filters
       ? Object.fromEntries(
@@ -99,10 +93,11 @@ export const apiClient = {
         )
       : undefined;
 
-    return fetchAPI<SearchResponse>("/search", {
-      method: "POST",
-      body: JSON.stringify({ query, filters: cleanFilters, limit }),
-    });
+    return fetchAPI<SearchResponse>(
+      "/search",
+      { method: "POST", body: JSON.stringify({ query, filters: cleanFilters, limit }) },
+      signal
+    );
   },
 
   /**
@@ -168,11 +163,12 @@ export const apiClient = {
   /**
    * 60-Second Mode: pick a film based on mood/context/craving
    */
-  sixtyPick: async (request: SixtyPickRequest): Promise<SixtyPickResponse> => {
-    return fetchAPI<SixtyPickResponse>("/sixty/pick", {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
+  sixtyPick: async (request: SixtyPickRequest, signal?: AbortSignal): Promise<SixtyPickResponse> => {
+    return fetchAPI<SixtyPickResponse>(
+      "/sixty/pick",
+      { method: "POST", body: JSON.stringify(request) },
+      signal
+    );
   },
 
   /**

@@ -36,6 +36,28 @@ export interface CastMember {
 export type MediaType = 'movie' | 'tv';
 
 /**
+ * A single streaming provider entry inside a region's flatrate/rent/buy list.
+ */
+export interface StreamingProvider {
+  provider_id?: number;
+  provider_name: string;
+  logo_path?: string | null;
+  display_priority?: number;
+}
+
+/**
+ * Per-region streaming availability (TMDB watch/providers format).
+ */
+export interface StreamingRegion {
+  link?: string;
+  flatrate?: StreamingProvider[];
+  rent?: StreamingProvider[];
+  buy?: StreamingProvider[];
+  free?: StreamingProvider[];
+  ads?: StreamingProvider[];
+}
+
+/**
  * Movie response schema (also used for TV shows)
  */
 export interface Movie {
@@ -57,7 +79,7 @@ export interface Movie {
   runtime: number | null;
   original_language: string;
   tagline: string | null;
-  streaming_providers?: Record<string, unknown> | null;
+  streaming_providers?: Record<string, StreamingRegion | StreamingProvider[]> | null;
 }
 
 /**
