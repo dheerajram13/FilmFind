@@ -1,4 +1,4 @@
-import type { Movie, MovieSearchResult } from "@/types/api";
+import type { Movie, MovieSearchResult, StreamingProvider, StreamingRegion } from "@/types/api";
 
 const STREAM_ICON_MAP: Record<string, string> = {
   netflix: "📺",
@@ -43,41 +43,37 @@ export function streamIcon(providerName: string): string {
   return STREAM_ICON_MAP[normalizeProviderName(providerName)] ?? "▶";
 }
 
-/** Recursively collect all `provider_name` strings from nested streaming data. */
-export function collectProviderNames(value: unknown, sink: Set<string>): void {
-  if (!value) return;
+/** Collect provider names from a provider list. */
+function collectFromList(list: StreamingProvider[] | undefined, sink: Set<string>): void {
+  list?.forEach((p) => {
+    if (p.provider_name) sink.add(p.provider_name);
+  });
+}
 
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectProviderNames(item, sink));
-    return;
-  }
-
-  if (typeof value !== "object") return;
-
-  const obj = value as Record<string, unknown>;
-  const name = obj.provider_name;
-  if (typeof name === "string" && name.length > 0) {
-    sink.add(name);
-  }
-
-  Object.values(obj).forEach((nested) => collectProviderNames(nested, sink));
+/** Collect provider names from a region entry. */
+function collectFromRegion(region: StreamingRegion, sink: Set<string>): void {
+  collectFromList(region.flatrate, sink);
+  collectFromList(region.rent, sink);
+  collectFromList(region.buy, sink);
+  collectFromList(region.free, sink);
+  collectFromList(region.ads, sink);
 }
 
 /** Extract all provider name strings from a movie's streaming_providers field. */
 export function getProviderNames(movie: Movie | MovieSearchResult): string[] {
-  if (!movie.streaming_providers || typeof movie.streaming_providers !== "object") {
-    return [];
-  }
+  if (!movie.streaming_providers) return [];
 
   const names = new Set<string>();
-  const providers = movie.streaming_providers as Record<string, unknown>;
 
-  Object.entries(providers).forEach(([key, value]) => {
-    // Skip two-letter country-code keys that aren't provider names
-    if (key.length > 0 && !/^[A-Z]{2}$/.test(key)) {
-      names.add(key);
+  Object.entries(movie.streaming_providers).forEach(([key, value]) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      collectFromList(value as StreamingProvider[], names);
+    } else if (typeof value === "object") {
+      // Skip two-letter country-code keys that aren't provider names
+      if (!/^[A-Z]{2}$/.test(key)) names.add(key);
+      collectFromRegion(value as StreamingRegion, names);
     }
-    collectProviderNames(value, names);
   });
 
   return Array.from(names);
