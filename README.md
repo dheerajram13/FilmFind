@@ -1,549 +1,186 @@
-# 🎬 FilmFind - AI-Powered Semantic Movie Discovery Engine
+# FilmFind — AI-Powered Semantic Movie Discovery
 
-> **Discover movies that match your mood, not just your keyword.**
+> **Describe what you want to watch. FilmFind finds it.**
 
-FilmFind is an AI-powered movie and TV series recommendation system that understands natural language queries, interprets emotional intent, and delivers personalized recommendations using semantic search, hybrid embeddings, and LLM-powered re-ranking.
+FilmFind is a semantic movie and TV show discovery engine that understands natural language. Ask for *"dark sci-fi movies like Interstellar with less romance"* and get back ranked, explained recommendations — not just keyword matches.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![GitHub last commit](https://img.shields.io/github/last-commit/dheerajram13/FilmFind)](https://github.com/dheerajram13/FilmFind/commits)
-
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 
 ---
 
-## 📖 Table of Contents
+## How It Works
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [What Makes FilmFind Unique](#-what-makes-filmfind-unique)
-- [Architecture](#-architecture)
-- [System Diagrams](#-system-diagrams)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-- [Project Structure](#-project-structure)
-- [API Documentation](#-api-documentation)
-- [Contributing](#-contributing)
-- [License](#-license)
+A search request flows through a multi-stage AI pipeline:
+
+```
+Query → LLM Parse → Embed (768-dim) → FAISS HNSW → Filter → Score → LLM Re-rank → Results
+```
+
+1. **QueryParser** — Gemini extracts themes, genres, year/language constraints, reference titles
+2. **EmbeddingService** — sentence-transformers (`all-mpnet-base-v2`) encodes the query to a 768-dim vector
+3. **SemanticRetrievalEngine** — FAISS HNSW finds top-k candidates by cosine similarity
+4. **FilterEngine** — applies hard filters (genre, year, rating, language, streaming provider)
+5. **MultiSignalScoringEngine** — re-ranks by semantic 50% + genre 20% + popularity/rating/recency 10% each
+6. **LLMReRanker** — Gemini writes a natural-language explanation for each result
+
+**60-Second Mode**: user picks mood/context/craving → SQL scoring across all enriched films → weighted random pick → LLM generates why-reasons.
 
 ---
 
-## 🎯 Overview
+## Tech Stack
 
-FilmFind goes beyond traditional movie recommendation systems by:
-
-- **Understanding Natural Language**: Ask in plain English like *"dark sci-fi movies like Interstellar with less romance"*
-- **Semantic Search**: Uses vector embeddings to understand themes, tones, and emotions
-- **Hybrid Intelligence**: Combines semantic similarity, metadata filtering, and LLM reasoning
-- **Explainable AI**: Each recommendation comes with reasoning and match scores
-- **Multi-Signal Scoring**: Balances semantic similarity, popularity, ratings, and recency
-
-### Example Queries
-
-```
-"Shows like Stranger Things but with more horror elements"
-"Movies about F1 racing with intense competition and personal rivalries"
-"Mystery and magical adventures like Harry Potter with school settings"
-"Lighthearted sitcoms like Friends about group of friends navigating life and relationships"
-"Series like Dark"
-```
-
-### UI Preview
-
-![FilmFind Home Page](images/home.png)
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI, Python 3.11, SQLAlchemy, Alembic |
+| Database | PostgreSQL via Supabase (pgvector HNSW index) |
+| ML | sentence-transformers/all-mpnet-base-v2 (768-dim), FAISS |
+| LLM | Gemini 2.0 Flash (primary) → Groq Llama 3.3 70B (fallback) → rule-based |
+| Cache | Redis (local dev) / Upstash (production) |
+| Frontend | Next.js 16, React 19, TypeScript, TailwindCSS 4, Framer Motion |
+| Images | Supabase Storage (poster/backdrop CDN) |
 
 ---
 
-## ✨ Key Features
+## Getting Started
 
-### 🧠 **Intelligent Query Understanding**
-- Natural language processing (NLP) to extract intent, themes, and constraints
-- Emotion-aware classification across 8 emotional dimensions
-- Reference title detection and similarity matching
-- Multi-language support (English, Hindi, Korean, Telugu, etc.)
+All services run via Docker Compose — no local Python or Node setup required.
 
-### 🔍 **Advanced Search & Retrieval**
-- **Semantic Vector Search**: FAISS-powered similarity search
-- **Hybrid Embeddings**: Combines plot, themes, genres, cast, and emotional vectors
-- **Multi-Signal Ranking**: Balances semantic similarity, popularity, ratings, and metadata
-- **Smart Filtering**: Year range, language, genre, streaming services, runtime
-
-### 🤖 **LLM-Powered Re-Ranking**
-- Uses Groq API (Llama 3.1 70B) or Ollama for intelligent re-ranking
-- Contextual understanding of nuanced queries
-- Generates human-readable explanations for each recommendation
-- Cost-optimized with caching and free tier APIs
-
-### 📊 **Rich Metadata Integration**
-- 10,000+ movies and TV shows from TMDB
-- Cast, crew, keywords, genres, ratings, popularity
-- Streaming availability (Netflix, Prime, Disney+, etc.)
-- Posters, backdrops, trailers
-
----
-
-## 🌟 What Makes FilmFind Unique
-
-### Comparison with Existing Platforms
-
-| Feature | Letterboxd | FilmCrave | MOVIERECS.AI | **FilmFind** |
-|---------|-----------|-----------|--------------|--------------|
-| **Natural Language Queries** | ❌ Basic search | ❌ No | ⚠️ Simple prompts | ✅ **Deep intent extraction** |
-| **Semantic Vector Search** | ❌ | ❌ | ❌ | ✅ **FAISS-powered** |
-| **Emotion-Aware Matching** | ⚠️ User tags only | ❌ | ❌ | ✅ **8-dimensional emotion vectors** |
-| **LLM Re-Ranking** | ❌ | ❌ | ❌ | ✅ **RAG with Llama 3.1** |
-| **Complex Multi-Condition Queries** | ❌ | ❌ | ❌ | ✅ **Fully supported** |
-| **Explainable Recommendations** | ❌ | ❌ | ❌ | ✅ **XAI with reasoning** |
-| **Multi-Language Support** | ❌ | ❌ | ❌ | ✅ **10+ languages** |
-| **Streaming Provider Filters** | ⚠️ Limited | ❌ | ❌ | ✅ **Full integration** |
-| **Cost** | Social only | Paid | Limited free | ✅ **100% Free Tier** |
-
-### Core Differentiators
-
-1. **Emotion-Aware Engine**: Scores movies across 8 emotional dimensions (Joy, Fear, Sadness, Awe, Thrill, Hope, Dark tone, Romance)
-2. **Hybrid Vector Embeddings**: Combines semantic, emotional, genre, and cast vectors into a unified representation
-3. **LLM Query Rewrite**: Transforms queries into optimized search vectors with theme extraction
-4. **Multi-Agent System**: Specialized agents for intent, emotion, filtering, retrieval, and re-ranking
-5. **Explainable AI**: Every recommendation includes thematic similarity %, emotional match %, and reasoning
-
----
-
-## 🏗️ Architecture
-
-FilmFind uses a **multi-layered AI pipeline** with the following components:
-
-```
-User Query → NLP Understanding → Semantic Retrieval → Multi-Signal Scoring → LLM Re-Ranking → Explainable Output
-```
-
-### High-Level Architecture
-
-![System Architecture](images/System%20Architecture.png)
-
-### Key Components
-
-1. **Data Pipeline**
-   - TMDB API integration for movie metadata
-   - Embedding generation using sentence-transformers
-   - Vector database (FAISS) for similarity search
-   - PostgreSQL/Supabase for metadata storage
-
-2. **Intelligence Layer**
-   - NLP Engine: Query parsing and intent extraction
-   - Embedding Service: Semantic vector generation
-   - Vector Search: FAISS similarity retrieval
-   - Scoring Engine: Multi-signal ranking
-   - LLM Re-Ranker: Contextual re-ranking with Groq/Ollama
-
-3. **API & Backend**
-   - FastAPI REST API
-   - Redis caching (Upstash)
-   - Background jobs for data updates
-   - Rate limiting and monitoring
-
-4. **Frontend**
-   - Next.js 14+ with App Router
-   - TailwindCSS + ShadCN UI
-   - Real-time search with debouncing
-   - Responsive design
-
-5. **Infrastructure**
-   - AWS ECS (Docker) for backend
-   - Vercel for frontend
-   - AWS RDS PostgreSQL
-   - AWS S3 + CloudFront
-   - Upstash Redis
-
----
-
-## 📊 System Diagrams
-
-### 1. System Architecture
-Complete end-to-end architecture showing all components and data flow.
-
-![System Architecture](images/System%20Archeitecture.png)
-
-### 2. Flow Diagram
-High-level flow of data through the system from query to recommendations.
-
-![Flow Diagram](images/Flow%20Diagram.png)
-
-### 3. Detailed Flow Chart
-Step-by-step processing pipeline with all validation and filtering stages.
-
-![Flow Chart](images/Flow%20Chart.png)
-
-### 4. Sequence Diagram
-Interaction sequence between all system components during a search request.
-
-![Sequence Diagram](images/Sequence-diagram.png)
-
----
-
-## 🛠️ Tech Stack
-
-### **Backend**
-- **Python 3.11+**: Core language
-- **FastAPI**: High-performance async API framework
-- **SQLAlchemy**: ORM for database operations
-- **PostgreSQL**: Primary database (AWS RDS or Supabase)
-- **FAISS**: Vector similarity search (Facebook AI)
-- **Redis**: Caching layer (Upstash free tier)
-- **APScheduler**: Background job scheduling
-
-### **AI/ML**
-- **sentence-transformers/all-mpnet-base-v2**: Semantic embeddings (768-dim)
-- **Groq API**: LLM for query understanding and re-ranking (free tier: 30 req/min)
-- **Ollama**: Local LLM alternative (Llama 3.2, unlimited)
-- **spaCy**: NLP for text processing and entity extraction
-
-### **Frontend**
-- **Next.js 14+**: React framework with App Router
-- **TypeScript**: Type-safe JavaScript
-- **TailwindCSS**: Utility-first CSS framework
-- **ShadCN UI**: Beautiful accessible components
-- **Zustand**: Lightweight state management
-
-### **DevOps & Infrastructure (FREE Tier)**
-- **Docker**: Containerization
-- **GitHub Actions**: CI/CD pipeline (2,000 min/month free)
-- **AWS ECS**: Container orchestration (750 hours/month free for 12 months)
-- **Vercel**: Frontend hosting (free forever for hobby projects)
-- **AWS RDS**: Database (t3.micro, 750 hours/month free for 12 months)
-- **AWS S3**: Object storage (5GB free)
-- **AWS CloudFront**: CDN (1TB transfer/month free)
-- **Sentry**: Error monitoring (5k events/month free)
-
-### **Data Sources**
-- **TMDB API**: Movie metadata, cast, crew, keywords (free tier)
-- **IMDb Datasets**: Additional ratings and metadata (free on Kaggle)
-
----
-
-## 🛠️ Backend Architecture Highlights
-
-### **TMDB Service Module (`app/services/TMDB/`)**
-
-Following Single Responsibility Principle, we've separated the TMDB service into three focused modules:
-
-#### **1. TMDBAPIClient** - HTTP Communication Layer
-```python
-from app.services.TMDB import TMDBAPIClient
-
-client = TMDBAPIClient(api_key="your_key")
-movie = client.get_movie(movie_id=550)
-popular = client.get_popular_movies(page=1)
-```
-- ✅ Handles all TMDB API requests
-- ✅ Built-in rate limiting (40 requests/10s)
-- ✅ Automatic error handling
-- ✅ Uses HTTPClient utility for retry logic
-
-#### **2. TMDBDataValidator** - Data Validation & Cleaning
-```python
-from app.services.TMDB import TMDBDataValidator
-
-validator = TMDBDataValidator()
-is_valid = validator.validate_movie(raw_data)
-cleaned = validator.clean_movie_data(raw_data)
-```
-- ✅ Validates required fields
-- ✅ Normalizes data structure
-- ✅ Handles missing/invalid dates
-- ✅ Extracts genres, cast, keywords
-
-#### **3. TMDBService** - High-Level Facade
-```python
-from app.services.TMDB import TMDBService
-
-with TMDBService() as service:
-    movie = service.fetch_movie(550)           # Fetch + validate + clean
-    popular = service.fetch_popular_movies()   # Batch fetch with validation
-    genres = service.get_all_genres()
-```
-- ✅ Simple interface to complex operations
-- ✅ Automatic validation and cleaning
-- ✅ Context manager for resource cleanup
-- ✅ Batch operations with pagination
-
-### **Reusable Utilities (`app/utils/`)**
-
-We've built a comprehensive utilities module following SOLID principles:
-
-#### **HTTPClient** - Generic HTTP wrapper with retry logic
-```python
-from app.utils import HTTPClient
-
-client = HTTPClient(base_url="https://api.example.com", timeout=30)
-data = client.get_json("/endpoint", params={"key": "value"})
-```
-- ✅ Automatic retry with exponential backoff
-- ✅ Built-in logging and error handling
-- ✅ Context manager support
-- ✅ Reusable across all services
-
-#### **RateLimiter** - API rate limiting utility
-```python
-from app.utils import RateLimiter
-
-limiter = RateLimiter(max_requests=30, time_window=60)
-limiter.check_and_wait()  # Automatically waits if limit exceeded
-```
-- ✅ Sliding window algorithm
-- ✅ Configurable limits
-- ✅ Thread-safe for single-threaded apps
-
-#### **Logger Setup** - Consistent logging across the app
-```python
-from app.utils import setup_logger, get_logger
-
-setup_logger("logs/app.log", "INFO")
-logger = get_logger(__name__)
-logger.info("Application started")
-```
-- ✅ Console + file logging
-- ✅ Log rotation (10 MB)
-- ✅ Color-coded output
-
-#### **Retry Decorator** - Exponential backoff for any function
-```python
-from app.utils import retry_with_backoff
-
-@retry_with_backoff(max_retries=3, initial_delay=1.0)
-def fetch_data():
-    return api.get("/data")
-```
-- ✅ Configurable retries
-- ✅ Exponential backoff
-- ✅ Custom exception handling
-
-### **Constants Module (`app/core/constants.py`)**
-
-Centralized constants for better maintainability:
-- 🔗 API URLs (TMDB, Groq, Ollama)
-- 🎯 LLM models and configurations
-- 📊 Scoring weights and dimensions
-- 🗄️ Cache TTLs and key prefixes
-- 🌍 Supported languages and genres
-- ⚙️ All magic numbers and strings in one place
-
-### **Design Patterns Used**
-
-- ✅ **Single Responsibility Principle** - Each class has one clear purpose
-- ✅ **Dependency Injection** - Services don't create their dependencies
-- ✅ **Facade Pattern** - Simple interfaces to complex subsystems
-- ✅ **Strategy Pattern** - Multiple ingestion strategies
-- ✅ **Decorator Pattern** - Retry logic via decorators
-- ✅ **Context Manager** - Proper resource cleanup
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.11 or higher
-- Node.js 18+ and npm/yarn
-- PostgreSQL 14+ (or Supabase account)
-- Redis (local or Upstash account)
-- TMDB API key (free)
-- Groq API key (free tier)
-
-### Installation
-
-#### 1. Clone the Repository
+### 1. Clone and configure
 
 ```bash
-git clone https://github.com/yourusername/filmfind.git
-cd filmfind
+git clone https://github.com/dheerajram13/FilmFind.git
+cd FilmFind
+cp .env.example .env
+# Fill in your API keys (see .env.example for all required vars)
 ```
 
-#### 2. Backend Setup
+### 2. Required API keys
+
+| Key | Where to get |
+|-----|-------------|
+| `DATABASE_URL` | Supabase project → Settings → Database |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/) (free) |
+| `GROQ_API_KEY` | [Groq Console](https://console.groq.com/) (free) |
+| `TMDB_API_KEY` | [TMDB Settings](https://www.themoviedb.org/settings/api) (free) |
+
+### 3. Start
 
 ```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-cat > .env << EOF
-TMDB_API_KEY=your_tmdb_key
-GROQ_API_KEY=your_groq_key
-DATABASE_URL=postgresql://user:password@localhost:5432/filmfind
-REDIS_URL=redis://localhost:6379
-VECTOR_MODEL=sentence-transformers/all-mpnet-base-v2
-LLM_PROVIDER=groq
-EOF
+docker compose up --build
 ```
 
-#### 3. Frontend Setup
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API docs: http://localhost:8000/api/docs (development only)
+
+### 4. Run the data pipeline (first time)
 
 ```bash
-cd ../frontend
-
-# Install dependencies
-npm install
-
-# Create .env.local file
-cat > .env.local << EOF
-NEXT_PUBLIC_API_URL=http://localhost:8000
-EOF
-```
-
-#### 4. Database Setup
-
-```bash
-cd ../backend
-
-# Run migrations
-alembic upgrade head
-
-# Optional: Seed with sample data
-python scripts/seed_data.py
-```
-
-#### 5. Data Ingestion
-
-```bash
-# Fetch movies from TMDB
-python scripts/ingest_tmdb.py --limit 10000
+# Ingest media from TMDB
+docker compose exec backend python scripts/ingest/ingest_media.py
 
 # Generate embeddings
-python scripts/generate_embeddings.py
+docker compose exec backend python scripts/ml/generate_embeddings.py
 
-# Build vector index
-python scripts/build_index.py
+# Build FAISS index
+docker compose exec backend python scripts/ml/build_index.py
+
+# LLM enrichment for 60-second mode (uses Gemini free tier)
+docker compose exec backend python scripts/enrich/enrich_films.py
+docker compose exec backend python scripts/ml/score_films.py
 ```
-
-#### 6. Run the Application
-
-```bash
-# Terminal 1: Start backend
-cd backend
-uvicorn app.main:app --reload --port 8000
-
-# Terminal 2: Start frontend
-cd frontend
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-filmfind/
+FilmFind/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── routes/
-│   │   │   │   ├── search.py          # Search endpoints
-│   │   │   │   ├── movies.py          # Movie detail endpoints
-│   │   │   │   └── filters.py         # Filter endpoints
-│   │   │   └── dependencies.py        # Dependency injection
+│   │   │   ├── routes/           # search, sixty, admin, health
+│   │   │   ├── dependencies.py   # DB session, auth, rate limiting, injection guard
+│   │   │   └── exceptions.py     # Custom exception hierarchy
 │   │   ├── core/
-│   │   │   ├── config.py              # Environment settings (Pydantic)
-│   │   │   ├── constants.py           # Application constants ✨
-│   │   │   ├── database.py            # Database connection
-│   │   │   └── cache.py               # Redis cache wrapper
+│   │   │   ├── config.py         # Pydantic settings (all env vars)
+│   │   │   ├── database.py       # SQLAlchemy engine + session
+│   │   │   ├── cache_manager.py  # Redis wrapper
+│   │   │   ├── middleware.py     # Security headers, error handling, logging
+│   │   │   ├── scheduler.py      # APScheduler background jobs
+│   │   │   └── scoring.py        # 60-sec mode valid enums + profiles
 │   │   ├── models/
-│   │   │   ├── movie.py               # Movie ORM models (SQLAlchemy)
-│   │   │   └── user.py                # User models (optional)
-│   │   ├── services/
-│   │   │   ├── TMDB/                   # TMDB Service Module ✅ Module 1.1
-│   │   │   │   ├── __init__.py         # Module exports
-│   │   │   │   ├── tmdb_client.py      # API HTTP client (SRP)
-│   │   │   │   ├── tmdb_validator.py   # Data validation & cleaning (SRP)
-│   │   │   │   └── tmdb_service.py     # High-level facade
-│   │   │   ├── embedding_service.py    # Embedding generation
-│   │   │   ├── vector_search.py        # FAISS vector search
-│   │   │   ├── query_parser.py         # NLP query parsing
-│   │   │   ├── reranker.py             # LLM re-ranking
-│   │   │   └── scoring_engine.py       # Multi-signal scoring
+│   │   │   ├── media.py          # Media base + Movie/TVShow subclasses (STI)
+│   │   │   └── session.py        # SearchSession, SixtySession analytics
 │   │   ├── schemas/
-│   │   │   ├── search.py              # Search request/response (Pydantic)
-│   │   │   └── movie.py               # Movie schemas (Pydantic)
-│   │   ├── utils/                     # Reusable utilities ✨
-│   │   │   ├── rate_limiter.py        # Rate limiting utility
-│   │   │   ├── http_client.py         # HTTP client with retry
-│   │   │   ├── logger.py              # Logging setup
-│   │   │   └── retry.py               # Retry decorator
-│   │   └── main.py                    # FastAPI app entry point
+│   │   │   ├── movie.py          # MovieResponse, MovieSearchResult (Pydantic v2)
+│   │   │   ├── query.py          # QueryIntent, QueryConstraints, ParsedQuery
+│   │   │   └── search.py         # SearchRequest, SearchResponse
+│   │   ├── services/
+│   │   │   ├── query_parser.py   # LLM query → structured intent
+│   │   │   ├── embedding_service.py  # sentence-transformers wrapper
+│   │   │   ├── retrieval_engine.py   # FAISS HNSW search
+│   │   │   ├── filter_engine.py      # Hard filter application
+│   │   │   ├── scoring_engine.py     # Multi-signal scoring weights
+│   │   │   ├── reranker.py           # LLM re-ranking + explanations
+│   │   │   ├── sixty_scorer.py       # SQL scoring for 60-sec mode
+│   │   │   ├── film_admin_service.py # Enrich / embed / cache refresh
+│   │   │   └── llm_client.py         # Gemini → Groq → rule-based fallback
+│   │   ├── repositories/
+│   │   │   ├── movie_repository.py   # Full DB query repository
+│   │   │   └── query_utils.py        # Lightweight query helpers
+│   │   ├── db/
+│   │   │   └── sessions.py       # Fire-and-forget analytics logging
+│   │   └── main.py               # FastAPI app + middleware stack
 │   ├── scripts/
-│   │   ├── ingest_tmdb.py             # Data ingestion ✅ Module 1.1
-│   │   ├── generate_embeddings.py     # Embedding generation
-│   │   └── build_index.py             # Vector index builder
-│   ├── tests/
-│   │   ├── test_search.py             # Search endpoint tests
-│   │   └── test_embeddings.py         # Embedding tests
-│   ├── data/
-│   │   ├── raw/                       # Raw TMDB JSON data
-│   │   ├── processed/                 # Cleaned data
-│   │   └── embeddings/                # Vector embeddings
-│   ├── logs/                          # Application logs
-│   ├── requirements.txt               # Python dependencies
-│   ├── .env.example                   # Environment template
-│   ├── Dockerfile                     # Docker configuration
-│   └── README.md                      # Backend documentation
+│   │   ├── ingest/               # TMDB ingestion + DB seeding
+│   │   ├── enrich/               # LLM narrative enrichment + streaming backfill
+│   │   ├── ml/                   # Embeddings, FAISS index, sixty-mode scoring
+│   │   ├── migrate/              # One-time migrations (Supabase image upload)
+│   │   └── utils/                # DB health check, query parser tester
+│   ├── tests/                    # pytest suite (500+ tests)
+│   ├── alembic/                  # DB migrations
+│   ├── Dockerfile.prod           # Production image (port 7860 for HF Spaces)
+│   └── requirements.txt
 │
 ├── frontend/
 │   ├── app/
-│   │   ├── page.tsx                   # Home page
-│   │   ├── search/
-│   │   │   └── page.tsx               # Search page
-│   │   ├── movie/[id]/
-│   │   │   └── page.tsx               # Movie detail page
-│   │   └── layout.tsx                 # Root layout
-│   ├── components/
-│   │   ├── SearchBar.tsx              # Search input component
-│   │   ├── MovieCard.tsx              # Movie card component
-│   │   ├── FilterPanel.tsx            # Filter sidebar
-│   │   └── ui/                        # ShadCN UI components
-│   ├── lib/
-│   │   ├── api.ts                     # API client
-│   │   └── utils.ts                   # Utility functions
+│   │   ├── page.tsx              # Entry point — renders FilmfindHome
+│   │   ├── layout.tsx            # Root layout + metadata
+│   │   └── globals.css           # Global styles
+│   ├── components/home/
+│   │   ├── FilmfindHome.tsx      # Top-level state orchestrator
+│   │   ├── HomeScreen.tsx        # Landing / search input
+│   │   ├── ResultsScreen.tsx     # Search results list
+│   │   ├── DetailScreen.tsx      # Movie detail view
+│   │   ├── ResultCard.tsx        # Individual result card
+│   │   ├── FiltersSidebar.tsx    # Genre/year/streaming filters
+│   │   └── SixtySecondMode.tsx   # 60-second pick mode
 │   ├── hooks/
-│   │   └── useSearch.ts               # Search hook
-│   ├── package.json
-│   └── next.config.js
+│   │   ├── useSearch.ts          # Search state + AbortController
+│   │   └── useFilters.ts         # Client-side filter state
+│   ├── lib/
+│   │   ├── api-client.ts         # Typed fetch wrapper (AbortSignal support)
+│   │   ├── movie-formatters.ts   # Pure formatting helpers
+│   │   ├── streaming-providers.ts # Provider name normalisation
+│   │   └── image-utils.ts        # TMDB/Supabase image URL helpers
+│   └── types/
+│       └── api.ts                # TypeScript interfaces matching backend schemas
 │
-├── images/                            # Architecture diagrams
-│   ├── System Archeitecture.png
-│   ├── Flow Diagram.png
-│   ├── Flow Chart.png
-│   └── Sequence-diagram.png
-│
-├── docs/
-│   ├── architecture.md                # Architecture documentation
-│   ├── api.md                         # API documentation
-│   └── deployment.md                  # Deployment guide
-│
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml                  # GitHub Actions workflow
-│
-├── docker-compose.yml                 # Docker compose configuration
-├── plan.md                            # Implementation plan
-├── Project Overview                   # Technical design doc
-└── README.md                          # This file
+├── .env.example                  # All required env vars with descriptions
+├── docker-compose.yml            # 3-service dev stack (backend, frontend, redis)
+├── plan.md                       # Deployment plan (HF Spaces + Vercel + Upstash)
+└── deploy.md                     # Step-by-step deployment guide
 ```
 
 ---
 
-## 📚 API Documentation
+## API Reference
 
-### Endpoints
-
-#### 1. Search Movies
+### Search
 
 ```http
 POST /api/search
@@ -554,225 +191,93 @@ Content-Type: application/json
   "limit": 10,
   "filters": {
     "year_min": 2010,
-    "year_max": 2024,
-    "language": "en",
-    "genres": ["Science Fiction"]
+    "language": "en"
   }
 }
 ```
 
-**Response:**
-```json
-{
-  "results": [
-    {
-      "id": 157336,
-      "title": "Interstellar",
-      "overview": "The adventures of a group of explorers...",
-      "rating": 8.4,
-      "match_score": 0.95,
-      "similarity_explanation": "Strong thematic match: space exploration, time dilation...",
-      "poster_url": "https://image.tmdb.org/...",
-      "genres": ["Science Fiction", "Drama"],
-      "release_date": "2014-11-07"
-    }
-  ],
-  "count": 10,
-  "query_interpretation": {
-    "themes": ["space", "dark", "science fiction"],
-    "excluded": ["romance"],
-    "reference_movies": ["Interstellar"]
-  }
-}
-```
-
-#### 2. Get Similar Movies
+### 60-Second Mode
 
 ```http
-GET /api/similar/{movie_id}?limit=10
-```
-
-#### 3. Get Movie Details
-
-```http
-GET /api/movie/{movie_id}
-```
-
-#### 4. Filter Movies
-
-```http
-POST /api/filter
+POST /api/sixty/pick
 Content-Type: application/json
 
 {
-  "genres": ["Thriller", "Mystery"],
-  "year_min": 2015,
-  "rating_min": 7.0,
-  "language": "en",
-  "streaming_providers": ["Netflix", "Prime Video"]
+  "mood": "chill",
+  "context": "solo-night",
+  "craving": "mind-blown"
 }
 ```
 
-#### 5. Trending Movies
+Valid values:
+- `mood`: `happy` `sad` `charged` `chill` `adventurous` `romantic`
+- `context`: `family` `date-night` `solo-night` `friends` `movie-night` `background`
+- `craving`: `laugh` `cry` `mind-blown` `thrilled` `inspired` `scared` `comforted` `wowed`
+
+### Health
 
 ```http
-GET /api/trending?limit=20&time_window=week
+GET /health
+GET /health/detailed
 ```
-
-For complete API documentation, see [docs/api.md](docs/api.md) or visit `/docs` (Swagger UI) when running the backend.
 
 ---
 
-## 🗓️ Future Enhancements
-- [ ] Mobile app (React Native)
-- [ ] Episode-level recommendations for TV shows
-- [ ] Real-time collaborative filtering
-- [ ] Multi-user social recommendations
-- [ ] Integration with more streaming services
-- [ ] Podcast and documentary support
+## Security
+
+- Rate limiting: 20 req/min (search), 10 req/min (sixty/pick) per IP — sliding window via Redis
+- Prompt injection guard on all queries
+- Admin endpoints require `Authorization: Bearer <ADMIN_SECRET>`
+- Security headers: HSTS, CSP, X-Frame-Options, Permissions-Policy
+- CORS restricted to configured origins only
 
 ---
 
-## 🎯 Success Metrics
+## Development Commands
 
-- ✅ Search response time < 500ms
-- ✅ 90%+ relevant results for test queries
-- ✅ Frontend Lighthouse score > 90
-- ✅ API uptime > 99%
-- ✅ 10,000+ movies indexed
-- ✅ Support for 10+ languages
-- ✅ Zero monthly costs (within free tier limits)
-- ✅ Cache hit rate > 70%
-- ✅ LLM calls within Groq free tier (30 req/min)
+```bash
+# Run tests
+docker compose exec backend python -m pytest
+
+# Linting
+docker compose exec backend ruff check app/
+docker compose exec frontend npm run lint
+
+# Type checking
+docker compose exec backend mypy app/
+docker compose exec frontend npm run type-check
+
+# DB migrations
+docker compose exec backend alembic upgrade head
+
+# Restart a single service
+docker compose restart backend
+```
 
 ---
 
-## 💡 Usage Examples
+## Deployment
 
-### Example 1: Reference-Based Search
-```
-Query: "Shows like Stranger Things but with more horror elements"
-```
-**FilmFind understands:**
-- Reference: Stranger Things
-- Enhancement: More horror/darker tone
-- Themes: Supernatural, group of kids, 80s setting
-- Recommended: The Twilight Zone, Locke & Key, Dark, Archive 81
+See [deploy.md](deploy.md) for the full guide. Target stack (100% free tier):
 
-### Example 2: Sports Drama Search
-```
-Query: "Movies about F1 racing with intense competition and personal rivalries"
-```
-**FilmFind understands:**
-- Themes: Formula 1, racing, competition, rivalry
-- Tone: Intense, dramatic
-- Sport: Motorsport/F1
-- Recommended: Rush, Ford v Ferrari, Senna, Grand Prix, Days of Thunder
-
-### Example 3: Fantasy Mystery Search
-```
-Query: "Mystery and magical adventures like Harry Potter with school settings"
-```
-**FilmFind understands:**
-- Reference: Harry Potter
-- Themes: Magic, mystery, coming-of-age
-- Setting: School/academy
-- Genre: Fantasy + Mystery
-- Recommended: The Chronicles of Narnia, Percy Jackson, His Dark Materials, The Magicians, A Discovery of Witches
-
-### Example 4: Sitcom Search
-```
-Query: "Lighthearted sitcoms like Friends about group of friends navigating life and relationships"
-```
-**FilmFind understands:**
-- Reference: Friends
-- Themes: Friendship, relationships, comedy of life
-- Tone: Lighthearted, feel-good
-- Genre: Sitcom
-- Recommended: How I Met Your Mother, New Girl, Brooklyn Nine-Nine, The Big Bang Theory, Modern Family
+| Service | Platform |
+|---------|----------|
+| Backend | Hugging Face Spaces (CPU Basic, 16GB RAM) |
+| Frontend | Vercel |
+| Database | Supabase (already live) |
+| Cache | Upstash Redis |
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-### Getting Started
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Write clear, commented code
-- Follow PEP 8 for Python code
-- Use TypeScript for frontend code
-- Write tests for new features
-- Update documentation as needed
-
-### Areas for Contribution
-- 🐛 Bug fixes
-- ✨ New features
-- 📝 Documentation improvements
-- 🎨 UI/UX enhancements
-- 🔧 Performance optimizations
-- 🧪 Test coverage
-- 🌍 Internationalization
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👨‍💻 Author
+## Author
 
 **Dheeraj Srirama**
-
-- GitHub: [@dheerajsrirama](https://github.com/dheerajsrirama)
-- LinkedIn: [Dheeraj Srirama](https://linkedin.com/in/dheerajsrirama)
+- GitHub: [@dheerajram13](https://github.com/dheerajram13)
+- LinkedIn: [dheerajsrirama](https://linkedin.com/in/dheerajsrirama)
 - Email: sriramadheeraj@gmail.com
 
 ---
 
-## 🙏 Acknowledgments
+## License
 
-- [TMDB](https://www.themoviedb.org/) for the comprehensive movie database API
-- [Groq](https://groq.com/) for providing free tier LLM API access
-- [Sentence Transformers](https://www.sbert.net/) for excellent embedding models
-- [FastAPI](https://fastapi.tiangolo.com/) for the amazing Python framework
-- [Next.js](https://nextjs.org/) for the powerful React framework
-- [ShadCN UI](https://ui.shadcn.com/) for beautiful UI components
-
----
-
-👨‍💻 Author
-
-**Dheeraj Srirama**
-- 🌐 Portfolio: [dheerajsrirama.netlify.app](https://dheerajsrirama.netlify.app/)
-- 💼 LinkedIn: [dheerajsrirama](https://linkedin.com/in/dheerajsrirama)
-- 🐙 GitHub: [@dheerajram13](https://github.com/dheerajram13)
-- 📧 Email: sriramadheeraj@gmail.com
-
----
-
-## 📞 Support
-
-If you have any questions, issues, or suggestions:
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/filmfind/issues)
-
----
-
-## ⭐ Show Your Support
-
-If you find FilmFind useful, please consider:
-- Giving it a ⭐ on GitHub
-- Sharing it with others
-- Contributing to the project
-- Reporting bugs and suggesting features
-
----
-
+MIT
