@@ -1,151 +1,91 @@
 # FilmFind Frontend
 
-AI-Powered Movie Discovery Engine - Frontend Application
+Next.js 16 frontend for the FilmFind semantic movie discovery engine.
 
-## Tech Stack
+## Stack
 
-- **Framework**: Next.js 14+ with App Router
-- **Language**: TypeScript (strict mode)
-- **Styling**: TailwindCSS 4.x
-- **UI Components**: ShadCN UI
-- **Icons**: Lucide React
-- **State Management**: React Hooks
-- **API Client**: Custom fetch wrapper with error handling
+- **Next.js 16** with App Router
+- **React 19**, TypeScript (strict mode)
+- **TailwindCSS 4**, Framer Motion
+- Custom fetch client with AbortController support
 
-## Project Structure
+## Quick Start
 
-```
-frontend/
-├── app/                    # Next.js App Router
-│   ├── layout.tsx         # Root layout
-│   ├── page.tsx           # Home page
-│   └── globals.css        # Global styles with Tailwind directives
-├── components/             # React components
-├── lib/                    # Utility functions
-│   ├── utils.ts           # Class name utilities (cn)
-│   └── api-client.ts      # Backend API client
-├── hooks/                  # Custom React hooks
-├── types/                  # TypeScript type definitions
-│   └── api.ts             # API response types
-├── public/                 # Static assets
-├── .env.local.example     # Environment variables template
-├── next.config.ts         # Next.js configuration
-├── tailwind.config.ts     # Tailwind configuration
-├── tsconfig.json          # TypeScript configuration
-└── package.json           # Dependencies and scripts
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- Backend API running on `http://localhost:8000`
-
-### Installation
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Create environment file:
-```bash
-cp .env.local.example .env.local
-```
-
-3. Update `.env.local` with your backend API URL:
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-### Development
-
-Run the development server:
+All commands run inside Docker — no local Node setup needed.
 
 ```bash
-npm run dev
+# From repo root
+docker compose up --build
+
+# Lint
+docker compose exec frontend npm run lint
+
+# Type check
+docker compose exec frontend npm run type-check
+
+# Production build
+docker compose exec frontend npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-### Start Production Server
-
-```bash
-npm start
-```
-
-### Type Checking
-
-Run TypeScript type checker:
-
-```bash
-npm run type-check
-```
-
-### Linting
-
-Run ESLint:
-
-```bash
-npm run lint
-```
-
-## API Client
-
-The `lib/api-client.ts` provides a type-safe wrapper around the backend API:
-
-```typescript
-import apiClient from "@/lib/api-client";
-
-// Search for movies
-const results = await apiClient.search("dark sci-fi like Interstellar");
-
-// Get movie details
-const movie = await apiClient.getMovie(550);
-
-// Get similar movies
-const similar = await apiClient.getSimilarMovies(550);
-
-// Filter movies
-const filtered = await apiClient.filterMovies({ genres: ["Action"], min_year: 2020 });
-
-// Get trending movies
-const trending = await apiClient.getTrending();
-```
+Frontend available at http://localhost:3000
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXT_PUBLIC_API_URL` | Backend API base URL | `http://localhost:8000` |
-| `NEXT_PUBLIC_DEBUG` | Enable debug mode | `false` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (for image CDN) | — |
 
-## Features
+Set these in `.env.local` (or `.env` at repo root for Docker Compose).
 
-- ✅ Next.js 14 with App Router
-- ✅ TypeScript with strict mode
-- ✅ TailwindCSS 4.x
-- ✅ ShadCN UI utilities
-- ✅ API client with error handling
-- ✅ Type-safe API responses
-- ✅ Environment configuration
-- ✅ ESLint + TypeScript linting
-- ✅ TMDB image optimization
+## Project Structure
 
-## Next Steps
+```
+frontend/
+├── app/
+│   ├── page.tsx              # Entry point — renders FilmfindHome
+│   ├── layout.tsx            # Root layout + metadata
+│   └── globals.css           # Global styles
+├── components/home/
+│   ├── FilmfindHome.tsx      # Top-level state orchestrator
+│   ├── HomeScreen.tsx        # Landing / search input
+│   ├── ResultsScreen.tsx     # Search results list
+│   ├── DetailScreen.tsx      # Movie detail view
+│   ├── ResultCard.tsx        # Individual result card
+│   ├── FiltersSidebar.tsx    # Genre/year/streaming filters
+│   └── SixtySecondMode.tsx   # 60-second mood-based pick mode
+├── hooks/
+│   ├── useSearch.ts          # Search state + in-flight abort
+│   └── useFilters.ts         # Client-side filter state
+├── lib/
+│   ├── api-client.ts         # Typed fetch wrapper (AbortSignal support)
+│   ├── movie-formatters.ts   # Pure display formatting helpers
+│   ├── streaming-providers.ts # Provider name normalisation + icons
+│   └── image-utils.ts        # TMDB/Supabase image URL resolution
+└── types/
+    └── api.ts                # TypeScript interfaces matching backend Pydantic schemas
+```
 
-Module 4.2 will add:
-- Search interface with debouncing
-- Movie cards and results display
-- Loading states and error handling
-- Advanced filters UI
-- Movie detail pages
+## API Client
+
+```typescript
+import apiClient from "@/lib/api-client";
+
+// Search (cancels previous in-flight request automatically)
+const results = await apiClient.search("dark sci-fi like Interstellar", undefined, 10);
+
+// 60-second pick
+const pick = await apiClient.sixtyPick({ mood: "chill", context: "solo-night", craving: "mind-blown" });
+
+// Log user action
+await apiClient.sixtyAction(sessionId, { watch_clicked: true });
+```
+
+The `search` and `sixtyPick` methods accept an optional `AbortSignal` — `useSearch` handles cancellation automatically when a new search starts before the previous one finishes.
+
+## Key Design Decisions
+
+- **No global state library** — all state lives in `useSearch` and `useFilters` hooks, passed as props
+- **`SixtySecondMode` is dynamically imported** — keeps the main bundle lean since it's a heavy component
+- **Image URLs** — `image-utils.ts` resolves TMDB paths to full CDN URLs, with Supabase Storage as the preferred source when available (`poster_supabase_url` takes priority over `poster_path`)
+- **Streaming providers** — `streaming-providers.ts` normalises inconsistent TMDB provider name strings (e.g. "Amazon Prime Video" → "prime video") before display
