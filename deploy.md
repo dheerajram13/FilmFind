@@ -152,33 +152,61 @@ curl -X POST $BACKEND/api/sixty/pick \
 
 ---
 
+## Phase 5 — Production Cron Pipeline
+
+The backend scheduler (`ENABLE_BACKGROUND_JOBS=true`) runs a full pipeline every **Sunday at 02:00 UTC**:
+
+| Stage | Script | What it does |
+|-------|--------|-------------|
+| `ingest` | `scripts/ingest/ingest_media.py` | Fetch new movies/TV from TMDB, upsert DB, upload images to Supabase Storage |
+| `embed` | `scripts/ml/generate_embeddings.py` | Generate 768-dim embeddings for rows that lack them |
+| `index` | `scripts/ml/build_index.py` | Rebuild FAISS HNSW index |
+| `enrich` | `scripts/enrich/enrich_films.py` | Gemini LLM enrichment (narrative_dna, themes, tone) |
+| `score` | `scripts/ml/score_films.py` | Generate 60-second mode scoring matrices |
+
+All stages are idempotent — safe to re-run. If a stage fails, the chain stops and the next weekly run picks up where it left off.
+
+### Enable on HF Spaces
+
+Add to Space Secrets:
+```
+ENABLE_BACKGROUND_JOBS = true
+```
+
+### Trigger manually (first run after deploy)
+
+```bash
+curl -X POST https://YOUR_HF_USERNAME-filmfind-api.hf.space/api/admin/jobs/weekly_pipeline/run \
+  -H "Authorization: Bearer $ADMIN_SECRET"
+```
+
+---
+
 ## Pre-Deploy Checklist
 
-### Code changes needed NOW (before any deploy)
-- [ ] Create `backend/Dockerfile.prod` (port 7860, model baked in)
-- [ ] Fix `docker-compose.yml`: `DATABASE_URL: ${DATABASE_URL}` (was `${SUPABASE_DB_URL}`)
-- [ ] Build + verify frontend: `docker compose exec frontend npm run build`
+### Already done ✅
+- [x] `backend/Dockerfile.prod` created (port 7860, model baked in)
+- [x] `docker-compose.yml` fixed: `DATABASE_URL: ${DATABASE_URL}`
+- [x] CORS made env-configurable
+- [x] Weekly pipeline cron job registered in scheduler
 
-### Accounts to create
-- [ ] Hugging Face account at https://huggingface.co
-- [ ] Upstash account at https://upstash.com
-- [ ] Vercel account at https://vercel.com (or log in with GitHub)
+### Still needed
+- [ ] `docker compose exec frontend npm run build` — verify no build errors
+- [ ] Create Hugging Face account → New Space (Docker, CPU Basic, Public)
+- [ ] Create Upstash Redis database (ap-southeast-2 region)
+- [ ] Connect GitHub repo to Vercel
 
-### Secrets to generate
-- [ ] `SECRET_KEY` — `python -c "import secrets; print(secrets.token_urlsafe(32))"`
-- [ ] `ADMIN_SECRET` — same command
+### Generate secrets
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Run twice — once for SECRET_KEY, once for ADMIN_SECRET
+```
 
 ### After deploy
-- [ ] CORS_ORIGINS updated to Vercel URL
-- [ ] Smoke tests pass
-- [ ] Run enrichment pipeline to score more films for sixty-mode:
-  ```bash
-  # On HF Space terminal or locally against Supabase:
-  docker compose exec backend python scripts/ml/generate_embeddings.py
-  docker compose exec backend python scripts/ml/build_index.py
-  # LLM enrichment (rate-limited to 1500/day on Gemini free tier):
-  docker compose exec backend python scripts/ml/score_films.py
-  ```
+- [ ] Set `CORS_ORIGINS` in HF Space Secrets to your Vercel URL
+- [ ] Set `ENABLE_BACKGROUND_JOBS=true` in HF Space Secrets
+- [ ] Smoke tests pass (Phase 4.2)
+- [ ] Trigger first pipeline run via admin endpoint to populate data
 
 ---
 
@@ -188,5 +216,5 @@ curl -X POST $BACKEND/api/sixty/pick \
 |-------|--------|
 | HF Space sleeps after 48hr inactivity | First request takes ~60s (model reload) |
 | Upstash 10K commands/day | ~3K requests/day with caching |
-| Gemini 15 RPM / 1500 RPD | LLM calls degrade under heavy load |
-| Only 18 scored films | 60-second mode limited until enrichment runs |
+| Gemini 15 RPM / 1500 RPD | Enrich/score pipeline is rate-limited; large datasets take multiple days |
+| Only 18 scored films currently | 60-second mode works but is limited — trigger pipeline manually after first deploy |

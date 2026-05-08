@@ -45,27 +45,21 @@ class JobScheduler:
             logger.warning("Jobs already registered, skipping")
             return
 
-        from app.jobs.embedding_jobs import rebuild_index, regenerate_embeddings
+        from app.jobs.pipeline_job import run_pipeline
 
-        # Weekly jobs (run on Sunday at 4 AM UTC)
+        # Full pipeline: ingest → embed → index → enrich → score
+        # Runs weekly on Sunday at 2 AM UTC.
+        # Each stage is idempotent — safe to re-run; only processes rows that need work.
         self.scheduler.add_job(
-            regenerate_embeddings,
-            trigger=CronTrigger(day_of_week="sun", hour=4, minute=0),
-            id="weekly_embedding_regen",
-            name="Weekly Embedding Regeneration",
-            replace_existing=True,
-        )
-
-        self.scheduler.add_job(
-            rebuild_index,
-            trigger=CronTrigger(day_of_week="sun", hour=5, minute=0),
-            id="weekly_index_rebuild",
-            name="Weekly Vector Index Rebuild",
+            run_pipeline,
+            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
+            id="weekly_pipeline",
+            name="Weekly Data Pipeline (ingest → embed → index → enrich → score)",
             replace_existing=True,
         )
 
         self._jobs_registered = True
-        logger.info("Registered 2 scheduled jobs (TMDB sync/popularity jobs not yet implemented)")
+        logger.info("Registered 1 scheduled job: weekly_pipeline (Sun 02:00 UTC)")
 
     def start(self) -> None:
         """Start the scheduler."""
