@@ -122,11 +122,14 @@ def make_rate_limit_dependency(limit: int):
             logger.warning("Rate limiter: Redis unavailable, skipping check")
             return
 
-        # Prefer X-Forwarded-For (reverse proxy), fall back to direct client IP
+        # Only trust X-Forwarded-For when the direct connection comes from a known proxy.
+        # Otherwise an attacker can spoof any IP by sending a custom header.
+        direct_ip = request.client.host if request.client else "unknown"
         forwarded = request.headers.get("X-Forwarded-For") or ""
-        ip = forwarded.split(",")[0].strip() or (
-            request.client.host if request.client else "unknown"
-        )
+        if forwarded and direct_ip in settings.trusted_proxies:
+            ip = forwarded.split(",")[0].strip() or direct_ip
+        else:
+            ip = direct_ip
         key = f"rl:{request.url.path}:{ip}"
         now_ms = int(time.time() * 1000)
         window_ms = 60_000

@@ -12,15 +12,15 @@ from app.schemas.movie import MovieSearchResult
 class SearchFilters(BaseModel):
     """Search filters"""
 
-    year_min: Optional[int] = Field(None, description="Minimum release year")
-    year_max: Optional[int] = Field(None, description="Maximum release year")
-    rating_min: Optional[float] = Field(None, description="Minimum rating (0-10)")
-    rating_max: Optional[float] = Field(None, description="Maximum rating (0-10)")
-    runtime_min: Optional[int] = Field(None, description="Minimum runtime in minutes")
-    runtime_max: Optional[int] = Field(None, description="Maximum runtime in minutes")
-    language: Optional[str] = Field(None, description="Original language code (e.g., 'en', 'ko')")
-    genres: Optional[list[str]] = Field(None, description="List of genre names")
-    streaming_providers: Optional[list[str]] = Field(None, description="Streaming service names")
+    year_min: Optional[int] = Field(None, ge=1888, le=2100, description="Minimum release year")
+    year_max: Optional[int] = Field(None, ge=1888, le=2100, description="Maximum release year")
+    rating_min: Optional[float] = Field(None, ge=0.0, le=10.0, description="Minimum rating (0-10)")
+    rating_max: Optional[float] = Field(None, ge=0.0, le=10.0, description="Maximum rating (0-10)")
+    runtime_min: Optional[int] = Field(None, ge=1, le=600, description="Minimum runtime in minutes")
+    runtime_max: Optional[int] = Field(None, ge=1, le=600, description="Maximum runtime in minutes")
+    language: Optional[str] = Field(None, min_length=2, max_length=10, description="Original language code (e.g., 'en', 'ko')")
+    genres: Optional[list[str]] = Field(None, max_length=20, description="List of genre names")
+    streaming_providers: Optional[list[str]] = Field(None, max_length=20, description="Streaming service names")
     exclude_adult: bool = Field(True, description="Exclude adult content")
     media_type: Optional[str] = Field(None, description="Media type filter: 'movie', 'tv_show', or 'both'")
 

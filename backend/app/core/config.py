@@ -127,6 +127,17 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_SEARCH_PER_MINUTE: int = 20   # /api/search (LLM-heavy)
     RATE_LIMIT_SIXTY_PER_MINUTE: int = 10    # /api/sixty/pick (LLM-heavy)
+    # Comma-separated CIDR/IP list of trusted reverse proxies that may set X-Forwarded-For.
+    # Leave empty to use direct client IP only (safe default).
+    TRUSTED_PROXIES_STR: str = Field(
+        default="",
+        description="Comma-separated IPs of trusted reverse proxies allowed to set X-Forwarded-For",
+        alias="TRUSTED_PROXIES",
+    )
+
+    @property
+    def trusted_proxies(self) -> set[str]:
+        return {p.strip() for p in self.TRUSTED_PROXIES_STR.split(",") if p.strip()}
 
     # Background Jobs
     ENABLE_BACKGROUND_JOBS: bool = False
@@ -138,7 +149,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_required_for_production(self) -> "Settings":
-        """Fail fast on missing critical config when not in debug/dev mode."""
+        """Fail fast on missing or insecure critical config when not in debug/dev mode."""
         if not self.DEBUG:
             missing = []
             if not self.DATABASE_URL or self.DATABASE_URL == "postgresql://postgres:postgres@localhost:5432/filmfind":
@@ -151,6 +162,17 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"Missing required environment variables for production: {', '.join(missing)}. "
                     "Set DEBUG=true to bypass this check in development."
+                )
+            # Reject insecure defaults that ship with the repo
+            if self.SECRET_KEY == "your-secret-key-change-in-production":
+                raise ValueError(
+                    "SECRET_KEY must be changed from the default value in production. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+                )
+            if self.ADMIN_SECRET and len(self.ADMIN_SECRET) < 32:
+                raise ValueError(
+                    "ADMIN_SECRET must be at least 32 characters. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
                 )
         return self
 

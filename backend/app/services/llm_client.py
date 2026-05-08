@@ -169,8 +169,8 @@ class LLMClient:
                 last_error = e
                 continue
 
-        msg = f"All LLM providers failed. Last error: {last_error}"
-        raise LLMClientError(msg) from last_error
+        logger.error(f"All LLM providers failed. Last error: {last_error}")
+        raise LLMClientError("LLM service unavailable") from last_error
 
     # -------------------------------------------------------------------------
     # Gemini

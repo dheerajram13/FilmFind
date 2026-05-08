@@ -38,6 +38,8 @@ export class APIError extends Error {
 /**
  * Generic fetch wrapper with error handling and AbortController support
  */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 async function fetchAPI<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -45,9 +47,16 @@ async function fetchAPI<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${API_PREFIX}${endpoint}`;
 
+  // Combine caller's AbortSignal with a 30-second timeout signal.
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), DEFAULT_TIMEOUT_MS);
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal;
+
   const config: RequestInit = {
     ...options,
-    signal,
+    signal: combinedSignal,
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -56,6 +65,7 @@ async function fetchAPI<T>(
 
   try {
     const response = await fetch(url, config);
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -68,6 +78,7 @@ async function fetchAPI<T>(
 
     return await response.json();
   } catch (error) {
+    clearTimeout(timeoutId);
     if (error instanceof APIError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new Error(`Network error: ${error instanceof Error ? error.message : "Unknown error"}`);
