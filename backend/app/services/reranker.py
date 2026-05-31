@@ -59,7 +59,8 @@ Guidelines:
 - Respect hard constraints (language, year, rating)
 - Value quality and ratings, but prioritize thematic fit
 - Keep explanations concise (1-2 sentences)
-- Be specific about what makes each movie relevant"""
+- Be specific about what makes each movie relevant
+- Only reference information present in the candidate's plot, genres, keywords, and cast — do not invent plot details"""
 
     @staticmethod
     def build_reranking_prompt(
@@ -196,8 +197,8 @@ Important:
             keywords = movie.get("keywords", [])
             keyword_names = [k.get("name") if isinstance(k, dict) else str(k) for k in keywords[:5]]
 
-            # Get cast (if available)
-            cast = movie.get("cast", [])
+            # Get cast (if available) — field may be "cast" or "cast_members"
+            cast = movie.get("cast") or movie.get("cast_members", [])
             cast_names = [c.get("name") if isinstance(c, dict) else str(c) for c in cast[:5]]
 
             # Get ratings

@@ -290,6 +290,7 @@ async def search_movies(
             results=[r.model_dump() for r in results[:10]],
             session_token=_session_token,
             response_ms=_response_ms,
+            confidence_score=query_intent.confidence_score if query_intent else None,
         )
     except Exception:
         pass  # never block the response

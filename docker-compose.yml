@@ -53,9 +53,13 @@ services:
       # Background Jobs
       ENABLE_BACKGROUND_JOBS: ${ENABLE_BACKGROUND_JOBS:-false}
 
+      # Security
+      SECRET_KEY: ${SECRET_KEY}
+
       # App Config
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: ${DEBUG:-false}
     volumes:
       - ./backend:/app
       - backend_data:/app/data

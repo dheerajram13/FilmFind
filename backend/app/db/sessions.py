@@ -27,6 +27,7 @@ async def _write_search_session(
     results: list,
     session_token: str,
     response_ms: int,
+    confidence_score: float | None = None,
 ) -> None:
     try:
         record = SearchSession(
@@ -36,6 +37,7 @@ async def _write_search_session(
             query_parsed=query_parsed,
             results=results,
             response_ms=response_ms,
+            confidence_score=confidence_score,
             created_at=datetime.now(UTC),
         )
         db.add(record)
@@ -55,6 +57,7 @@ def log_search_session(
     results: list,
     session_token: str,
     response_ms: int,
+    confidence_score: float | None = None,
 ) -> str:
     """
     Fire-and-forget: log a search session.
@@ -63,7 +66,7 @@ def log_search_session(
     """
     session_id = str(uuid.uuid4())
     asyncio.create_task(
-        _write_search_session(db, session_id, query_text, query_parsed, results, session_token, response_ms)
+        _write_search_session(db, session_id, query_text, query_parsed, results, session_token, response_ms, confidence_score)
     )
     return session_id
 

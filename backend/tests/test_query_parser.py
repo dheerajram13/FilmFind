@@ -316,7 +316,7 @@ class TestLLMParser:
             parsed = query_parser.parse("dark sci-fi movies like Interstellar with less romance")
 
             assert parsed.parsing_method == "llm"
-            assert parsed.confidence_score == 0.9
+            assert parsed.confidence_score > 0.6  # computed from populated fields
             assert "Interstellar" in parsed.intent.reference_titles
             assert ToneType.DARK in parsed.intent.tones
             assert "Science Fiction" in parsed.constraints.genres

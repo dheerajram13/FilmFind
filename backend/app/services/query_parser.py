@@ -201,7 +201,7 @@ Now parse the query and respond with JSON only."""
         response_json = self.llm_client.generate_json(
             prompt=user_prompt,
             system_prompt=system_prompt,
-            temperature=0.3,  # Lower temperature for more consistent extraction
+            temperature=0.1,  # Near-deterministic for structured constraint extraction
             max_tokens=1024,
         )
 
@@ -250,12 +250,21 @@ Now parse the query and respond with JSON only."""
         # Get search text
         search_text = response_json.get("search_text", query)
 
+        # Score based on how many key fields the LLM actually populated
+        populated = sum([
+            bool(response_json.get("themes")),
+            bool(response_json.get("tones")),
+            bool(response_json.get("emotions")),
+            bool(response_json.get("search_text") and response_json.get("search_text") != query),
+        ])
+        llm_confidence = 0.6 + (populated / 4) * 0.35  # Range: 0.60–0.95
+
         # Build ParsedQuery
         return ParsedQuery(
             intent=intent,
             constraints=constraints,
             search_text=search_text,
-            confidence_score=0.9,  # High confidence for LLM parsing
+            confidence_score=llm_confidence,
             parsing_method="llm",
         )
 
