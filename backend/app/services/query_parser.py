@@ -16,6 +16,7 @@ import re
 
 from loguru import logger
 
+from app.prompts import load_prompt
 from app.schemas.query import (
     EmotionType,
     MediaType,
@@ -26,6 +27,11 @@ from app.schemas.query import (
     ToneType,
 )
 from app.services.llm_client import LLMClient, LLMClientError
+
+try:
+    _QUERY_PARSER_SYSTEM_PROMPT = load_prompt("query_parser", "1")
+except FileNotFoundError:
+    _QUERY_PARSER_SYSTEM_PROMPT = None
 
 
 class QueryParser:
@@ -96,36 +102,10 @@ class QueryParser:
         Returns:
             ParsedQuery with extracted information
         """
-        system_prompt = """You are an expert at understanding movie and TV show search queries.
-Extract structured information from user queries including:
-- Themes (e.g., "time travel", "revenge", "coming of age")
-- Tones (dark, light, serious, comedic, intense, etc.)
-- Emotions (joy, fear, sadness, awe, thrill, hope, romance, dark_tone)
-- Reference titles (movies/shows mentioned)
-- Constraints (language, year, genre, etc.)
-- Undesired elements (things user wants to avoid or minimize)
-
-CRITICAL: Pay careful attention to negative/exclusion patterns in the query.
-Extract undesired elements by looking for:
-1. "with less X" / "with fewer X" → extract X as undesired
-2. "without X" / "with no X" → extract X as undesired
-3. "no X" / "avoid X" / "not X" → extract X as undesired
-4. "less X" / "fewer X" (standalone) → extract X as undesired
-5. "minus the X" / "but without X" → extract X as undesired
-
-Examples of undesired element extraction:
-- "with less romance" → undesired_themes: ["romance"]
-- "without violence" → undesired_themes: ["violence"]
-- "no horror elements" → undesired_themes: ["horror", "horror elements"]
-- "less dark tone" → undesired_tones: ["dark"]
-- "avoid jump scares" → undesired_themes: ["jump scares"]
-- "but without the comedy" → undesired_themes: ["comedy"]
-
-When categorizing undesired elements:
-- If it's a tone (dark, light, serious, comedic, etc.) → add to undesired_tones
-- Otherwise → add to undesired_themes
-
-Respond with valid JSON only."""
+        system_prompt = _QUERY_PARSER_SYSTEM_PROMPT or (
+            "You are an expert at understanding movie and TV show search queries. "
+            "Respond with valid JSON only."
+        )
 
         user_prompt = f"""Parse this movie/TV show search query and extract information:
 

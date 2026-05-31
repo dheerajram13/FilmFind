@@ -24,9 +24,16 @@ from typing import Any
 
 from loguru import logger
 
+from app.prompts import load_prompt
 from app.schemas.query import ParsedQuery
 from app.services.exceptions import LLMClientError, LLMRateLimitError
 from app.services.llm_client import LLMClient
+
+
+try:
+    _RERANKER_SYSTEM_PROMPT = load_prompt("reranker", "1")
+except FileNotFoundError:
+    _RERANKER_SYSTEM_PROMPT = None
 
 
 class PromptTemplate:
@@ -37,7 +44,7 @@ class PromptTemplate:
     towards consistent, high-quality responses.
     """
 
-    SYSTEM_PROMPT = """You are an expert movie recommendation system. \
+    SYSTEM_PROMPT = _RERANKER_SYSTEM_PROMPT or ("""You are an expert movie recommendation system. \
 Your task is to analyze a user's query and rank movies based on how \
 well they match the user's intent, considering themes, tone, emotions, \
 and constraints.
@@ -60,7 +67,7 @@ Guidelines:
 - Value quality and ratings, but prioritize thematic fit
 - Keep explanations concise (1-2 sentences)
 - Be specific about what makes each movie relevant
-- Only reference information present in the candidate's plot, genres, keywords, and cast — do not invent plot details"""
+- Only reference information present in the candidate's plot, genres, keywords, and cast — do not invent plot details""")
 
     @staticmethod
     def build_reranking_prompt(

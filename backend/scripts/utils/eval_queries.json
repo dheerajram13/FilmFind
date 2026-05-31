@@ -1,0 +1,135 @@
+[
+  {
+    "query": "dark sci-fi movies like Interstellar with less romance",
+    "expect_themes_any": ["space", "exploration", "science fiction", "time"],
+    "expect_genres_any": ["Science Fiction"],
+    "expect_undesired_themes_any": ["romance"],
+    "expect_tones_any": ["dark", "serious"],
+    "expect_year_min": null,
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "lighthearted comedies like Friends about a group of friends",
+    "expect_themes_any": ["friendship", "comedy", "relationships"],
+    "expect_genres_any": ["Comedy"],
+    "expect_undesired_themes_any": [],
+    "expect_tones_any": ["light", "comedic"],
+    "expect_reference_titles_any": ["Friends"],
+    "expect_media_type": "both"
+  },
+  {
+    "query": "Telugu action movies from 2020 to 2023 with high ratings",
+    "expect_themes_any": ["action", "heroism"],
+    "expect_genres_any": ["Action"],
+    "expect_languages_any": ["te"],
+    "expect_year_min": 2020,
+    "expect_year_max": 2023,
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "thriller without jump scares and no violence",
+    "expect_themes_any": ["suspense", "mystery", "thriller"],
+    "expect_genres_any": ["Thriller"],
+    "expect_undesired_themes_any": ["jump scares", "violence"],
+    "expect_tones_any": ["suspenseful"]
+  },
+  {
+    "query": "animated movies for kids",
+    "expect_genres_any": ["Animation", "Family"],
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "Korean drama series about love and loss",
+    "expect_themes_any": ["love", "loss", "romance"],
+    "expect_genres_any": ["Drama", "Romance"],
+    "expect_languages_any": ["ko"],
+    "expect_media_type": "tv_show"
+  },
+  {
+    "query": "90s crime movies like Pulp Fiction",
+    "expect_themes_any": ["crime", "violence", "gangster"],
+    "expect_genres_any": ["Crime", "Thriller"],
+    "expect_reference_titles_any": ["Pulp Fiction"],
+    "expect_year_min": 1990,
+    "expect_year_max": 1999,
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "feel-good movies to watch on a rainy Sunday",
+    "expect_themes_any": ["feel-good", "uplifting", "comfort"],
+    "expect_tones_any": ["light", "inspirational"]
+  },
+  {
+    "query": "psychological horror with a twist ending",
+    "expect_themes_any": ["psychological", "horror", "twist", "mystery"],
+    "expect_genres_any": ["Horror", "Thriller"],
+    "expect_tones_any": ["dark", "suspenseful"]
+  },
+  {
+    "query": "documentaries about climate change",
+    "expect_themes_any": ["climate", "environment", "nature"],
+    "expect_genres_any": ["Documentary"],
+    "expect_media_type": "both"
+  },
+  {
+    "query": "romantic comedies set in New York",
+    "expect_themes_any": ["romance", "love", "comedy", "new york"],
+    "expect_genres_any": ["Romance", "Comedy"],
+    "expect_tones_any": ["comedic", "light"]
+  },
+  {
+    "query": "action movies with strong female leads",
+    "expect_themes_any": ["action", "female", "empowerment", "strong"],
+    "expect_genres_any": ["Action"]
+  },
+  {
+    "query": "movies about artificial intelligence and robots",
+    "expect_themes_any": ["artificial intelligence", "robots", "technology", "AI"],
+    "expect_genres_any": ["Science Fiction"]
+  },
+  {
+    "query": "classic black and white films from the 1950s",
+    "expect_themes_any": ["classic", "vintage"],
+    "expect_year_min": 1950,
+    "expect_year_max": 1959,
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "superhero movies without too much CGI",
+    "expect_themes_any": ["superhero", "hero", "powers"],
+    "expect_genres_any": ["Action", "Science Fiction"],
+    "expect_undesired_themes_any": ["CGI"],
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "Hindi movies about family drama",
+    "expect_themes_any": ["family", "drama", "relationships"],
+    "expect_genres_any": ["Drama"],
+    "expect_languages_any": ["hi"],
+    "expect_media_type": "movie"
+  },
+  {
+    "query": "war movies rated above 8 on IMDB",
+    "expect_themes_any": ["war", "battle", "military"],
+    "expect_genres_any": ["War", "Drama", "Action"],
+    "expect_rating_min": 7.0
+  },
+  {
+    "query": "mystery series like Sherlock",
+    "expect_themes_any": ["mystery", "detective", "investigation"],
+    "expect_genres_any": ["Mystery", "Crime", "Drama"],
+    "expect_reference_titles_any": ["Sherlock"],
+    "expect_media_type": "tv_show"
+  },
+  {
+    "query": "coming of age stories set in high school",
+    "expect_themes_any": ["coming of age", "high school", "teen", "adolescence"],
+    "expect_genres_any": ["Drama", "Comedy"]
+  },
+  {
+    "query": "heist movies with a clever plot twist",
+    "expect_themes_any": ["heist", "robbery", "twist", "clever"],
+    "expect_genres_any": ["Crime", "Thriller", "Action"],
+    "expect_media_type": "movie"
+  }
+]
