@@ -111,6 +111,43 @@ class LLMClient:
 
         return chain
 
+    def _compress_prompt(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+    ) -> tuple[str, str | None]:
+        """Compress prompt and system_prompt via Headroom before sending to LLM.
+
+        Falls back silently to originals if headroom is unavailable or fails.
+        """
+        try:
+            from headroom import compress  # lazy — optional dependency
+        except ImportError:
+            return prompt, system_prompt
+
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        try:
+            result = compress(messages)
+            logger.debug(
+                f"Headroom: saved {result.tokens_saved} tokens "
+                f"({result.compression_ratio:.0%} compression ratio)"
+            )
+            compressed_system: str | None = None
+            compressed_prompt = prompt
+            for msg in result.messages:
+                if msg["role"] == "system":
+                    compressed_system = msg["content"]
+                elif msg["role"] == "user":
+                    compressed_prompt = msg["content"]
+            return compressed_prompt, compressed_system
+        except Exception as e:
+            logger.warning(f"Headroom compression failed, using original prompt: {e}")
+            return prompt, system_prompt
+
     def generate_completion(
         self,
         prompt: str,
@@ -135,6 +172,7 @@ class LLMClient:
         Raises:
             LLMClientError: If all providers in the chain fail
         """
+        prompt, system_prompt = self._compress_prompt(prompt, system_prompt)
         use_json_mode = response_format is not None and response_format.get("type") == "json_object"
         last_error: Exception | None = None
 
