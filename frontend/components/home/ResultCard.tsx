@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import Image from "next/image";
 import { getBackdropUrl, getPlaceholderImage, getPosterUrl } from "@/lib/image-utils";
 import {
@@ -10,6 +10,7 @@ import {
   primaryGenre,
   runtimeLabel,
   scoreAsPercent,
+  scoreLabel,
 } from "@/lib/movie-formatters";
 import type { MovieSearchResult } from "@/types/api";
 
@@ -42,6 +43,7 @@ export function ResultCard({
   const isExpanded = expandedId === movie.id;
   const rankOpacity = Math.max(0.62, 1 - (rank - 1) * 0.08);
   const similarityPct = Math.round((movie.similarity_score ?? 0) * 100);
+  const [nerdMode, setNerdMode] = useState(false);
 
   const handleOpenDetails = useCallback(
     (e: React.MouseEvent) => {
@@ -126,21 +128,34 @@ export function ResultCard({
       </button>
 
       <div className="ff-r-breakdown">
-        <div className="ff-breakdown-title">Score breakdown</div>
+        <div className="ff-breakdown-title">
+          Score breakdown
+          <button
+            type="button"
+            className="ff-nerd-toggle"
+            onClick={() => setNerdMode((v) => !v)}
+          >
+            {nerdMode ? "hide numbers" : "nerd mode"}
+          </button>
+        </div>
         <div className="ff-score-bars">
           <div className="ff-score-row">
             <span className="ff-score-lbl">Narrative fit</span>
             <div className="ff-score-track">
               <div className="ff-score-fill ff-fill-gold" style={{ width: `${match}%` }} />
             </div>
-            <span className="ff-score-num">{(match / 100).toFixed(2)}</span>
+            <span className="ff-score-num">
+              {nerdMode ? (movie.relevance_score ?? 0).toFixed(2) : scoreLabel(match)}
+            </span>
           </div>
           <div className="ff-score-row">
             <span className="ff-score-lbl">Semantic fit</span>
             <div className="ff-score-track">
               <div className="ff-score-fill ff-fill-teal" style={{ width: `${similarityPct}%` }} />
             </div>
-            <span className="ff-score-num">{(movie.similarity_score ?? 0).toFixed(2)}</span>
+            <span className="ff-score-num">
+              {nerdMode ? (movie.similarity_score ?? 0).toFixed(2) : scoreLabel(similarityPct)}
+            </span>
           </div>
         </div>
         {movie.match_explanation && (

@@ -50,6 +50,14 @@ export function scoreAsPercent(movie: MovieSearchResult): number {
   return Math.min(Math.round(score * 100), 99);
 }
 
+/** Convert a 0–100 display percentage to a qualitative label. */
+export function scoreLabel(pct: number): string {
+  if (pct >= 92) return "Excellent";
+  if (pct >= 84) return "Strong";
+  if (pct >= 76) return "Good";
+  return "Fair";
+}
+
 export function primaryGenre(movie: MovieSearchResult | Movie): string {
   return movie.genres[0]?.name ?? "Drama";
 }

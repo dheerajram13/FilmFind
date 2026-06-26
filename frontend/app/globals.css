@@ -1009,6 +1009,24 @@ select {
   color: rgba(240, 237, 232, 0.42);
   text-transform: uppercase;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ff-nerd-toggle {
+  font-family: "DM Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: rgba(240, 237, 232, 0.28);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  padding: 0;
+}
+.ff-nerd-toggle:hover {
+  color: rgba(240, 237, 232, 0.6);
 }
 
 .ff-score-bars {
