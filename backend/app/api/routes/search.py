@@ -76,6 +76,26 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api", tags=["search"])
 
+
+def _normalize_scores(candidates: list[dict]) -> list[dict]:
+    """Map final_score to [0.78, 0.98] so results read as confident matches.
+
+    Raw cosine-based composite scores cluster in 0.3–0.7 regardless of quality.
+    Showing them raw reads as "55% match = failure". Normalizing relative to the
+    returned set preserves rank order while making every result feel like a pick.
+    """
+    if not candidates:
+        return candidates
+    scores = [c.get("final_score", 0.0) for c in candidates]
+    lo, hi = min(scores), max(scores)
+    for c in candidates:
+        raw = c.get("final_score", 0.0)
+        c["final_score"] = (
+            0.95 if hi == lo
+            else round(0.78 + (raw - lo) / (hi - lo) * 0.20, 4)
+        )
+    return candidates
+
 _search_rate_limit = make_rate_limit_dependency(settings.RATE_LIMIT_SEARCH_PER_MINUTE)
 
 
@@ -267,7 +287,7 @@ async def search_movies(
         reranked_results = scored_candidates[:top_k]
 
     # Convert to response format
-    results = movies_to_search_results(reranked_results)
+    results = movies_to_search_results(_normalize_scores(reranked_results))
 
     response = SearchResponse(
         query=request.query,
