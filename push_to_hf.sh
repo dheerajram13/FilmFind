@@ -17,7 +17,7 @@ set -e
 
 HF_USERNAME="${1:?Usage: ./push_to_hf.sh <HF_USERNAME>}"
 SPACE_NAME="filmfind-api"
-HF_REPO="https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+HF_REPO="git@hf.co:spaces/${HF_USERNAME}/${SPACE_NAME}"
 BACKEND_DIR="$(cd "$(dirname "$0")/backend" && pwd)"
 WORK_DIR="/tmp/filmfind-hf-push"
 
@@ -37,7 +37,8 @@ git clone "$HF_REPO" "$WORK_DIR" || {
 }
 
 cd "$WORK_DIR"
-git lfs install --local
+# Install git-lfs if available (not required for Python/text files)
+git lfs install --local 2>/dev/null || true
 
 # ── 3. Copy backend files ────────────────────────────────────────────────────
 echo "==> Copying backend files..."
