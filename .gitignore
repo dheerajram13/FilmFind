@@ -283,6 +283,7 @@ $RECYCLE.BIN/
 *.onnx
 models/
 !models/.gitkeep
+!backend/app/models/
 
 # FAISS Indexes
 *.index
