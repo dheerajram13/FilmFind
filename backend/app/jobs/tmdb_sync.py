@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.api.cache_dependencies import get_cache_invalidator
-from app.models.media import Movie
+from app.models.media import Media, Movie
 from app.services.tmdb.tmdb_service import TMDBService
 from app.utils.job_utils import JobStats, execute_with_db
 from app.utils.logger import get_logger
@@ -121,14 +121,16 @@ def _create_movie(db: Session, movie_data: dict) -> None:
         db: Database session
         movie_data: Movie data from TMDB
     """
+    anchor = Media(content_type="Movie")
+    db.add(anchor)
+    db.flush()  # get anchor.id
+
     movie = Movie(
+        media_id=anchor.id,
         tmdb_id=movie_data["id"],
         title=movie_data.get("title", ""),
         overview=movie_data.get("overview", ""),
         release_date=movie_data.get("release_date"),
-        poster_path=movie_data.get("poster_path"),
-        backdrop_path=movie_data.get("backdrop_path"),
-        genres=movie_data.get("genres", []),
         vote_average=movie_data.get("vote_average", 0.0),
         vote_count=movie_data.get("vote_count", 0),
         popularity=movie_data.get("popularity", 0.0),
