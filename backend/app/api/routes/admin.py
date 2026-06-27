@@ -10,9 +10,10 @@ Provides:
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import DatabaseSession, require_admin
-from app.models.media import Media
+from app.models.media import Media, Movie, TVShow
 from app.models.session import SearchSession, SixtySession
 from app.services.film_admin_service import (
     EmbeddingRegenerationService,
@@ -38,13 +39,22 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 )
 async def enrich_film(film_id: int, db: DatabaseSession) -> dict:
     """Run Stage 2 Gemini enrichment on a single film."""
-    film = db.query(Media).filter(Media.id == film_id).first()
-    if not film:
+    anchor = (
+        db.query(Media)
+        .filter(Media.id == film_id)
+        .options(selectinload(Media.movie), selectinload(Media.tv_show))
+        .first()
+    )
+    if not anchor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Film {film_id} not found")
 
+    concrete: Movie | TVShow | None = anchor.movie or anchor.tv_show
+    if not concrete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Film {film_id} has no concrete record")
+
     try:
-        result = FilmEnrichmentService().enrich(db, film)
-        return {"film_id": film_id, "title": film.title, "status": "enriched", **result}
+        result = FilmEnrichmentService().enrich(db, concrete)
+        return {"film_id": film_id, "title": concrete.title, "status": "enriched", **result}
     except ValueError as exc:
         logger.warning(f"Admin enrich validation error for film {film_id}: {exc}")
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enrichment validation failed")
@@ -60,13 +70,22 @@ async def enrich_film(film_id: int, db: DatabaseSession) -> dict:
 )
 async def regenerate_embedding(film_id: int, db: DatabaseSession) -> dict:
     """Regenerate the FAISS embedding for a single film."""
-    film = db.query(Media).filter(Media.id == film_id).first()
-    if not film:
+    anchor = (
+        db.query(Media)
+        .filter(Media.id == film_id)
+        .options(selectinload(Media.movie), selectinload(Media.tv_show))
+        .first()
+    )
+    if not anchor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Film {film_id} not found")
 
+    concrete: Movie | TVShow | None = anchor.movie or anchor.tv_show
+    if not concrete:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Film {film_id} has no concrete record")
+
     try:
-        dim = EmbeddingRegenerationService().regenerate(db, film)
-        return {"film_id": film_id, "title": film.title, "dim": dim, "status": "embedded"}
+        dim = EmbeddingRegenerationService().regenerate(db, concrete)
+        return {"film_id": film_id, "title": concrete.title, "dim": dim, "status": "embedded"}
     except Exception as exc:
         logger.error(f"Admin embed failed for film {film_id}: {exc}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Embedding regeneration failed")

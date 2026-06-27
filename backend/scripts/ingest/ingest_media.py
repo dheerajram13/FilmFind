@@ -162,22 +162,34 @@ def _link_cast(db, media_id: int, cast_id_map: dict[int, int], cast_list: list[d
 
 def _upload_images(storage: Optional[SupabaseStorageService], db, media_id: int, tmdb_id: int,
                    poster_path: Optional[str], backdrop_path: Optional[str]):
-    """Upload images and update DB columns. Skips if storage is None (dry-run)."""
+    """Upload images to Supabase and upsert rows into media_asset."""
     if not storage:
         return
-    updates = {}
     if poster_path:
         url = storage.upload_poster(tmdb_id, poster_path)
         if url:
-            updates["poster_supabase_url"] = url
+            # Supabase poster is now primary; demote any existing TMDB poster
+            db.execute(text("""
+                UPDATE media_asset SET is_primary = FALSE
+                WHERE media_id = :mid AND asset_type = 'poster'
+            """), {"mid": media_id})
+            db.execute(text("""
+                INSERT INTO media_asset (media_id, asset_type, source, url, is_primary, display_order, created_at)
+                VALUES (:mid, 'poster', 'supabase', :url, TRUE, 0, NOW())
+                ON CONFLICT DO NOTHING
+            """), {"mid": media_id, "url": url})
     if backdrop_path:
         url = storage.upload_backdrop(tmdb_id, backdrop_path)
         if url:
-            updates["backdrop_supabase_url"] = url
-    if updates:
-        set_clause = ", ".join(f"{k} = :{k}" for k in updates)
-        updates["id"] = media_id
-        db.execute(text(f"UPDATE media SET {set_clause} WHERE id = :id"), updates)
+            db.execute(text("""
+                UPDATE media_asset SET is_primary = FALSE
+                WHERE media_id = :mid AND asset_type = 'backdrop'
+            """), {"mid": media_id})
+            db.execute(text("""
+                INSERT INTO media_asset (media_id, asset_type, source, url, is_primary, display_order, created_at)
+                VALUES (:mid, 'backdrop', 'supabase', :url, TRUE, 0, NOW())
+                ON CONFLICT DO NOTHING
+            """), {"mid": media_id, "url": url})
 
 
 # ---------------------------------------------------------------------------
@@ -237,79 +249,125 @@ def ingest_movies(max_pages: int, dry_run: bool = False):
                 skipped += 1
                 continue
 
-            # Upsert media row
-            result = db.execute(text("""
-                INSERT INTO media (
-                    media_type, tmdb_id, title, original_title, overview, tagline,
-                    release_date, status, adult, popularity, vote_average, vote_count,
-                    original_language, poster_path, backdrop_path, imdb_id,
-                    belongs_to_collection, production_countries, spoken_languages,
-                    origin_country, production_companies, embedding_needs_rebuild,
-                    is_fully_scored, created_at, updated_at
-                ) VALUES (
-                    'movie', :tmdb_id, :title, :original_title, :overview, :tagline,
-                    :release_date, :status, :adult, :popularity, :vote_average, :vote_count,
-                    :original_language, :poster_path, :backdrop_path, :imdb_id,
-                    :belongs_to_collection, :production_countries, :spoken_languages,
-                    :origin_country, :production_companies, true, false, NOW(), NOW()
-                )
-                ON CONFLICT (tmdb_id) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    overview = EXCLUDED.overview,
-                    popularity = EXCLUDED.popularity,
-                    vote_average = EXCLUDED.vote_average,
-                    vote_count = EXCLUDED.vote_count,
-                    poster_path = EXCLUDED.poster_path,
-                    backdrop_path = EXCLUDED.backdrop_path,
-                    status = EXCLUDED.status,
-                    updated_at = NOW()
-                RETURNING id, (xmax = 0) AS inserted
-            """), {
-                "tmdb_id": tid,
-                "title": cleaned["title"],
-                "original_title": cleaned.get("original_title"),
-                "overview": cleaned.get("overview"),
-                "tagline": cleaned.get("tagline"),
-                "release_date": cleaned.get("release_date"),
-                "status": cleaned.get("status"),
-                "adult": cleaned.get("adult", False),
-                "popularity": cleaned.get("popularity"),
-                "vote_average": cleaned.get("vote_average"),
-                "vote_count": cleaned.get("vote_count"),
-                "original_language": cleaned.get("original_language"),
-                "poster_path": cleaned.get("poster_path"),
-                "backdrop_path": cleaned.get("backdrop_path"),
-                "imdb_id": cleaned.get("imdb_id"),
-                "belongs_to_collection": _j(cleaned.get("belongs_to_collection")),
-                "production_countries": cleaned.get("production_countries") or [],
-                "spoken_languages": cleaned.get("spoken_languages") or [],
-                "origin_country": cleaned.get("origin_country") or [],
-                "production_companies": _j(cleaned.get("production_companies") or []),
-            })
-            row = result.fetchone()
-            media_id = row.id
+            # Check if movie already exists
+            existing = db.execute(
+                text("SELECT id, media_id FROM movies WHERE tmdb_id = :tid"),
+                {"tid": tid},
+            ).fetchone()
 
-            # Upsert movies subtable
-            db.execute(text("""
-                INSERT INTO movies (id, runtime, budget, revenue)
-                VALUES (:id, :runtime, :budget, :revenue)
-                ON CONFLICT (id) DO UPDATE SET
-                    runtime = EXCLUDED.runtime,
-                    budget = EXCLUDED.budget,
-                    revenue = EXCLUDED.revenue
-            """), {
-                "id": media_id,
-                "runtime": cleaned.get("runtime"),
-                "budget": cleaned.get("budget", 0),
-                "revenue": cleaned.get("revenue", 0),
-            })
+            if existing:
+                media_id = existing.media_id
+                inserted = False
+                db.execute(text("""
+                    UPDATE movies SET
+                        title = :title, original_title = :original_title,
+                        overview = :overview, tagline = :tagline,
+                        release_date = :release_date, status = :status,
+                        adult = :adult, popularity = :popularity,
+                        vote_average = :vote_average, vote_count = :vote_count,
+                        original_language = :original_language,
+                        imdb_id = :imdb_id,
+                        belongs_to_collection = :belongs_to_collection,
+                        production_countries = :production_countries,
+                        spoken_languages = :spoken_languages,
+                        origin_country = :origin_country,
+                        production_companies = :production_companies,
+                        streaming_providers = :streaming_providers,
+                        runtime = :runtime, budget = :budget, revenue = :revenue,
+                        updated_at = NOW()
+                    WHERE tmdb_id = :tmdb_id
+                """), {
+                    "tmdb_id": tid,
+                    "title": cleaned["title"],
+                    "original_title": cleaned.get("original_title"),
+                    "overview": cleaned.get("overview"),
+                    "tagline": cleaned.get("tagline"),
+                    "release_date": cleaned.get("release_date"),
+                    "status": cleaned.get("status"),
+                    "adult": cleaned.get("adult", False),
+                    "popularity": cleaned.get("popularity"),
+                    "vote_average": cleaned.get("vote_average"),
+                    "vote_count": cleaned.get("vote_count"),
+                    "original_language": cleaned.get("original_language"),
+                    "imdb_id": cleaned.get("imdb_id"),
+                    "belongs_to_collection": _j(cleaned.get("belongs_to_collection")),
+                    "production_countries": cleaned.get("production_countries") or [],
+                    "spoken_languages": cleaned.get("spoken_languages") or [],
+                    "origin_country": cleaned.get("origin_country") or [],
+                    "production_companies": _j(cleaned.get("production_companies") or []),
+                    "streaming_providers": _j(cleaned.get("streaming_providers")),
+                    "runtime": cleaned.get("runtime"),
+                    "budget": cleaned.get("budget", 0),
+                    "revenue": cleaned.get("revenue", 0),
+                })
+            else:
+                # Create media anchor first
+                anchor = db.execute(
+                    text("INSERT INTO media (content_type, created_at) VALUES ('Movie', NOW()) RETURNING id"),
+                ).fetchone()
+                media_id = anchor.id
+                inserted = True
+
+                # Insert initial poster/backdrop as media_asset rows
+                poster_path = cleaned.get("poster_path")
+                backdrop_path = cleaned.get("backdrop_path")
+                if poster_path:
+                    db.execute(text("""
+                        INSERT INTO media_asset (media_id, asset_type, source, url, file_path, is_primary, display_order, created_at)
+                        VALUES (:mid, 'poster', 'tmdb', :url, :path, TRUE, 0, NOW())
+                    """), {"mid": media_id, "url": f"https://image.tmdb.org/t/p/w500{poster_path}", "path": poster_path})
+                if backdrop_path:
+                    db.execute(text("""
+                        INSERT INTO media_asset (media_id, asset_type, source, url, file_path, is_primary, display_order, created_at)
+                        VALUES (:mid, 'backdrop', 'tmdb', :url, :path, TRUE, 0, NOW())
+                    """), {"mid": media_id, "url": f"https://image.tmdb.org/t/p/original{backdrop_path}", "path": backdrop_path})
+
+                db.execute(text("""
+                    INSERT INTO movies (
+                        media_id, tmdb_id, imdb_id, title, original_title, overview, tagline,
+                        release_date, status, adult, popularity, vote_average, vote_count,
+                        original_language, belongs_to_collection, production_countries,
+                        spoken_languages, origin_country, production_companies,
+                        streaming_providers, runtime, budget, revenue, created_at, updated_at
+                    ) VALUES (
+                        :media_id, :tmdb_id, :imdb_id, :title, :original_title, :overview, :tagline,
+                        :release_date, :status, :adult, :popularity, :vote_average, :vote_count,
+                        :original_language, :belongs_to_collection, :production_countries,
+                        :spoken_languages, :origin_country, :production_companies,
+                        :streaming_providers, :runtime, :budget, :revenue, NOW(), NOW()
+                    )
+                """), {
+                    "media_id": media_id,
+                    "tmdb_id": tid,
+                    "imdb_id": cleaned.get("imdb_id"),
+                    "title": cleaned["title"],
+                    "original_title": cleaned.get("original_title"),
+                    "overview": cleaned.get("overview"),
+                    "tagline": cleaned.get("tagline"),
+                    "release_date": cleaned.get("release_date"),
+                    "status": cleaned.get("status"),
+                    "adult": cleaned.get("adult", False),
+                    "popularity": cleaned.get("popularity"),
+                    "vote_average": cleaned.get("vote_average"),
+                    "vote_count": cleaned.get("vote_count"),
+                    "original_language": cleaned.get("original_language"),
+                    "belongs_to_collection": _j(cleaned.get("belongs_to_collection")),
+                    "production_countries": cleaned.get("production_countries") or [],
+                    "spoken_languages": cleaned.get("spoken_languages") or [],
+                    "origin_country": cleaned.get("origin_country") or [],
+                    "production_companies": _j(cleaned.get("production_companies") or []),
+                    "streaming_providers": _j(cleaned.get("streaming_providers")),
+                    "runtime": cleaned.get("runtime"),
+                    "budget": cleaned.get("budget", 0),
+                    "revenue": cleaned.get("revenue", 0),
+                })
 
             _link_genres(db, media_id, genre_map, genre_names)
             _link_keywords(db, media_id, kw_map, kw_names)
             _link_cast(db, media_id, cast_id_map, cast_list)
 
-            # Upload images (only for new rows to avoid redundant uploads)
-            if row.inserted:
+            # Upload to Supabase only for new rows (avoid redundant uploads)
+            if inserted:
                 _upload_images(storage, db, media_id, tid,
                                cleaned.get("poster_path"), cleaned.get("backdrop_path"))
 
@@ -381,88 +439,135 @@ def ingest_tv(max_pages: int, dry_run: bool = False):
                 skipped += 1
                 continue
 
-            result = db.execute(text("""
-                INSERT INTO media (
-                    media_type, tmdb_id, title, original_title, overview, tagline,
-                    release_date, status, adult, popularity, vote_average, vote_count,
-                    original_language, poster_path, backdrop_path, imdb_id,
-                    production_countries, spoken_languages, origin_country,
-                    production_companies, embedding_needs_rebuild, is_fully_scored,
-                    created_at, updated_at
-                ) VALUES (
-                    'tv', :tmdb_id, :title, :original_title, :overview, :tagline,
-                    :release_date, :status, :adult, :popularity, :vote_average, :vote_count,
-                    :original_language, :poster_path, :backdrop_path, :imdb_id,
-                    :production_countries, :spoken_languages, :origin_country,
-                    :production_companies, true, false, NOW(), NOW()
-                )
-                ON CONFLICT (tmdb_id) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    overview = EXCLUDED.overview,
-                    popularity = EXCLUDED.popularity,
-                    vote_average = EXCLUDED.vote_average,
-                    vote_count = EXCLUDED.vote_count,
-                    poster_path = EXCLUDED.poster_path,
-                    backdrop_path = EXCLUDED.backdrop_path,
-                    status = EXCLUDED.status,
-                    updated_at = NOW()
-                RETURNING id, (xmax = 0) AS inserted
-            """), {
-                "tmdb_id": tid,
-                "title": cleaned["title"],
-                "original_title": cleaned.get("original_title"),
-                "overview": cleaned.get("overview"),
-                "tagline": cleaned.get("tagline"),
-                "release_date": cleaned.get("release_date"),
-                "status": cleaned.get("status"),
-                "adult": cleaned.get("adult", False),
-                "popularity": cleaned.get("popularity"),
-                "vote_average": cleaned.get("vote_average"),
-                "vote_count": cleaned.get("vote_count"),
-                "original_language": cleaned.get("original_language"),
-                "poster_path": cleaned.get("poster_path"),
-                "backdrop_path": cleaned.get("backdrop_path"),
-                "imdb_id": cleaned.get("imdb_id"),
-                "production_countries": cleaned.get("production_countries") or [],
-                "spoken_languages": cleaned.get("spoken_languages") or [],
-                "origin_country": cleaned.get("origin_country") or [],
-                "production_companies": _j(cleaned.get("production_companies") or []),
-            })
-            row = result.fetchone()
-            media_id = row.id
+            existing = db.execute(
+                text("SELECT id, media_id FROM tv_shows WHERE tmdb_id = :tid"),
+                {"tid": tid},
+            ).fetchone()
 
-            # Upsert tv_shows subtable
-            db.execute(text("""
-                INSERT INTO tv_shows (
-                    id, number_of_seasons, number_of_episodes, episode_run_time,
-                    first_air_date, last_air_date, in_production, networks, created_by, show_type
-                ) VALUES (
-                    :id, :seasons, :episodes, :run_time,
-                    :first_air, :last_air, :in_production, :networks, :created_by, :show_type
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    number_of_seasons = EXCLUDED.number_of_seasons,
-                    number_of_episodes = EXCLUDED.number_of_episodes,
-                    in_production = EXCLUDED.in_production,
-                    last_air_date = EXCLUDED.last_air_date
-            """), {
-                "id": media_id,
-                "seasons": full.get("number_of_seasons"),
-                "episodes": full.get("number_of_episodes"),
-                "run_time": _j(full.get("episode_run_time")),
-                "first_air": cleaned.get("release_date"),
-                "last_air": tmdb.validator._parse_date(full.get("last_air_date")),
-                "in_production": full.get("in_production", False),
-                "networks": _j(cleaned.get("networks") or []),
-                "created_by": _j(cleaned.get("created_by") or []),
-                "show_type": cleaned.get("show_type"),
-            })
+            if existing:
+                media_id = existing.media_id
+                inserted = False
+                db.execute(text("""
+                    UPDATE tv_shows SET
+                        title = :title, original_title = :original_title,
+                        overview = :overview, tagline = :tagline,
+                        release_date = :release_date, status = :status,
+                        adult = :adult, popularity = :popularity,
+                        vote_average = :vote_average, vote_count = :vote_count,
+                        original_language = :original_language,
+                        imdb_id = :imdb_id,
+                        production_countries = :production_countries,
+                        spoken_languages = :spoken_languages,
+                        origin_country = :origin_country,
+                        production_companies = :production_companies,
+                        streaming_providers = :streaming_providers,
+                        number_of_seasons = :seasons, number_of_episodes = :episodes,
+                        episode_run_time = :run_time, last_air_date = :last_air,
+                        in_production = :in_production, networks = :networks,
+                        created_by = :created_by, show_type = :show_type,
+                        updated_at = NOW()
+                    WHERE tmdb_id = :tmdb_id
+                """), {
+                    "tmdb_id": tid,
+                    "title": cleaned["title"],
+                    "original_title": cleaned.get("original_title"),
+                    "overview": cleaned.get("overview"),
+                    "tagline": cleaned.get("tagline"),
+                    "release_date": cleaned.get("release_date"),
+                    "status": cleaned.get("status"),
+                    "adult": cleaned.get("adult", False),
+                    "popularity": cleaned.get("popularity"),
+                    "vote_average": cleaned.get("vote_average"),
+                    "vote_count": cleaned.get("vote_count"),
+                    "original_language": cleaned.get("original_language"),
+                    "imdb_id": cleaned.get("imdb_id"),
+                    "production_countries": cleaned.get("production_countries") or [],
+                    "spoken_languages": cleaned.get("spoken_languages") or [],
+                    "origin_country": cleaned.get("origin_country") or [],
+                    "production_companies": _j(cleaned.get("production_companies") or []),
+                    "streaming_providers": _j(cleaned.get("streaming_providers")),
+                    "seasons": full.get("number_of_seasons"),
+                    "episodes": full.get("number_of_episodes"),
+                    "run_time": _j(full.get("episode_run_time")),
+                    "last_air": tmdb.validator._parse_date(full.get("last_air_date")),
+                    "in_production": full.get("in_production", False),
+                    "networks": _j(cleaned.get("networks") or []),
+                    "created_by": _j(cleaned.get("created_by") or []),
+                    "show_type": cleaned.get("show_type"),
+                })
+            else:
+                anchor = db.execute(
+                    text("INSERT INTO media (content_type, created_at) VALUES ('TV Show', NOW()) RETURNING id"),
+                ).fetchone()
+                media_id = anchor.id
+                inserted = True
+
+                poster_path = cleaned.get("poster_path")
+                backdrop_path = cleaned.get("backdrop_path")
+                if poster_path:
+                    db.execute(text("""
+                        INSERT INTO media_asset (media_id, asset_type, source, url, file_path, is_primary, display_order, created_at)
+                        VALUES (:mid, 'poster', 'tmdb', :url, :path, TRUE, 0, NOW())
+                    """), {"mid": media_id, "url": f"https://image.tmdb.org/t/p/w500{poster_path}", "path": poster_path})
+                if backdrop_path:
+                    db.execute(text("""
+                        INSERT INTO media_asset (media_id, asset_type, source, url, file_path, is_primary, display_order, created_at)
+                        VALUES (:mid, 'backdrop', 'tmdb', :url, :path, TRUE, 0, NOW())
+                    """), {"mid": media_id, "url": f"https://image.tmdb.org/t/p/original{backdrop_path}", "path": backdrop_path})
+
+                db.execute(text("""
+                    INSERT INTO tv_shows (
+                        media_id, tmdb_id, imdb_id, title, original_title, overview, tagline,
+                        release_date, status, adult, popularity, vote_average, vote_count,
+                        original_language, production_countries, spoken_languages,
+                        origin_country, production_companies, streaming_providers,
+                        number_of_seasons, number_of_episodes, episode_run_time,
+                        last_air_date, in_production, networks, created_by, show_type,
+                        created_at, updated_at
+                    ) VALUES (
+                        :media_id, :tmdb_id, :imdb_id, :title, :original_title, :overview, :tagline,
+                        :release_date, :status, :adult, :popularity, :vote_average, :vote_count,
+                        :original_language, :production_countries, :spoken_languages,
+                        :origin_country, :production_companies, :streaming_providers,
+                        :seasons, :episodes, :run_time,
+                        :last_air, :in_production, :networks, :created_by, :show_type,
+                        NOW(), NOW()
+                    )
+                """), {
+                    "media_id": media_id,
+                    "tmdb_id": tid,
+                    "imdb_id": cleaned.get("imdb_id"),
+                    "title": cleaned["title"],
+                    "original_title": cleaned.get("original_title"),
+                    "overview": cleaned.get("overview"),
+                    "tagline": cleaned.get("tagline"),
+                    "release_date": cleaned.get("release_date"),
+                    "status": cleaned.get("status"),
+                    "adult": cleaned.get("adult", False),
+                    "popularity": cleaned.get("popularity"),
+                    "vote_average": cleaned.get("vote_average"),
+                    "vote_count": cleaned.get("vote_count"),
+                    "original_language": cleaned.get("original_language"),
+                    "production_countries": cleaned.get("production_countries") or [],
+                    "spoken_languages": cleaned.get("spoken_languages") or [],
+                    "origin_country": cleaned.get("origin_country") or [],
+                    "production_companies": _j(cleaned.get("production_companies") or []),
+                    "streaming_providers": _j(cleaned.get("streaming_providers")),
+                    "seasons": full.get("number_of_seasons"),
+                    "episodes": full.get("number_of_episodes"),
+                    "run_time": _j(full.get("episode_run_time")),
+                    "last_air": tmdb.validator._parse_date(full.get("last_air_date")),
+                    "in_production": full.get("in_production", False),
+                    "networks": _j(cleaned.get("networks") or []),
+                    "created_by": _j(cleaned.get("created_by") or []),
+                    "show_type": cleaned.get("show_type"),
+                })
 
             _link_genres(db, media_id, genre_map, genre_names)
             _link_keywords(db, media_id, kw_map, kw_names)
             _link_cast(db, media_id, cast_id_map, cast_list)
 
-            if row.inserted:
+            if inserted:
                 _upload_images(storage, db, media_id, tid,
                                cleaned.get("poster_path"), cleaned.get("backdrop_path"))
 
