@@ -21,7 +21,7 @@ from loguru import logger
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
-from app.models.media import Media
+from app.models.media import Media, MediaEnrichment, Movie, TVShow
 from app.services.llm_client import LLMClient
 
 
@@ -47,17 +47,40 @@ def enrich_batch(batch_size: int, offset: int = 0) -> None:
     client = LLMClient()
 
     try:
-        films = (
-            db.query(Media)
-            .filter(Media.narrative_dna.is_(None))
-            .order_by(Media.popularity.desc())
+        from sqlalchemy.orm import selectinload, outerjoin
+
+        # Find movies and TV shows that have no enrichment row yet
+        movies_to_enrich = (
+            db.query(Movie)
+            .outerjoin(Movie.media).outerjoin(Media.enrichment)
+            .filter(MediaEnrichment.media_id.is_(None))
+            .options(
+                selectinload(Movie.media).selectinload(Media.genres),
+                selectinload(Movie.media).selectinload(Media.enrichment),
+            )
+            .order_by(Movie.popularity.desc())
             .offset(offset)
             .limit(batch_size)
             .all()
         )
+        remaining = batch_size - len(movies_to_enrich)
+        shows_to_enrich = (
+            db.query(TVShow)
+            .outerjoin(TVShow.media).outerjoin(Media.enrichment)
+            .filter(MediaEnrichment.media_id.is_(None))
+            .options(
+                selectinload(TVShow.media).selectinload(Media.genres),
+                selectinload(TVShow.media).selectinload(Media.enrichment),
+            )
+            .order_by(TVShow.popularity.desc())
+            .limit(remaining)
+            .all()
+        ) if remaining > 0 else []
+
+        films = movies_to_enrich + shows_to_enrich
 
         if not films:
-            logger.info("No films need enrichment (narrative_dna already set for all).")
+            logger.info("No films need enrichment.")
             return
 
         logger.info(f"Enriching {len(films)} films (offset={offset})")
@@ -67,7 +90,8 @@ def enrich_batch(batch_size: int, offset: int = 0) -> None:
 
         for film in films:
             try:
-                genre_names = ", ".join(g.name for g in (film.genres or []))
+                genres = film.media.genres if film.media else []
+                genre_names = ", ".join(g.name for g in genres)
                 overview = film.overview or "No overview available."
 
                 prompt = (
@@ -87,22 +111,28 @@ def enrich_batch(batch_size: int, offset: int = 0) -> None:
 
                 data = _parse_enrichment(raw)
                 if not data:
-                    logger.warning(f"[{film.id}] {film.title!r}: failed to parse LLM response")
+                    logger.warning(f"[{film.media_id}] {film.title!r}: failed to parse LLM response")
                     failed += 1
                     continue
 
-                film.narrative_dna = data.get("narrative_dna") or None
-                film.themes = data.get("themes") or []
-                film.tone_tags = data.get("tone_tags") or []
-                film.darkness_score = _clamp(data.get("darkness_score"), 0, 10)
-                film.complexity_score = _clamp(data.get("complexity_score"), 0, 10)
-                film.energy_score = _clamp(data.get("energy_score"), 0, 10)
+                # Upsert into media_enrichment (satellite table)
+                enrich = film.media.enrichment if film.media else None
+                if enrich is None:
+                    enrich = MediaEnrichment(media_id=film.media_id)
+                    db.add(enrich)
+
+                enrich.narrative_dna    = data.get("narrative_dna") or None
+                enrich.themes           = data.get("themes") or []
+                enrich.tone_tags        = data.get("tone_tags") or []
+                enrich.darkness_score   = _clamp(data.get("darkness_score"), 0, 10)
+                enrich.complexity_score = _clamp(data.get("complexity_score"), 0, 10)
+                enrich.energy_score     = _clamp(data.get("energy_score"), 0, 10)
 
                 db.commit()
                 enriched += 1
                 logger.info(
-                    f"[{film.id}] {film.title!r}: darkness={film.darkness_score} "
-                    f"complexity={film.complexity_score} energy={film.energy_score}"
+                    f"[{film.media_id}] {film.title!r}: darkness={enrich.darkness_score} "
+                    f"complexity={enrich.complexity_score} energy={enrich.energy_score}"
                 )
 
                 # Respect Gemini free tier rate limits (15 RPM)

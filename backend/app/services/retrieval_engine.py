@@ -313,53 +313,48 @@ class SemanticRetrievalEngine:
             return []
 
         try:
-            # Extract movie IDs
+            # Extract media IDs (pgvector search returns media_ids)
             movie_ids = [movie_id for movie_id, _ in candidates]
 
             # pgvector returns cosine similarity directly (1 - cosine_distance), range 0-1
             score_map = {movie_id: score for movie_id, score in candidates}
 
-            # Fetch media from database (includes both movies and TV shows)
-            movies = self.movie_repo.find_by_ids(movie_ids)
+            # Fetch Media anchors (includes both movies and TV shows via relationships)
+            anchors = self.movie_repo.find_by_ids(movie_ids)
 
-            # Enrich with similarity scores
+            # Enrich with similarity scores — resolve concrete type from each anchor
             enriched = []
-            for movie in movies:
+            for anchor in anchors:
+                concrete = anchor.movie or anchor.tv_show
+                if not concrete:
+                    continue
+
+                year = concrete.release_date.year if concrete.release_date else None
                 movie_dict = {
-                    "movie_id": movie.id,
-                    "tmdb_id": movie.tmdb_id,
-                    "media_type": movie.media_type,
-                    "title": movie.title,
-                    "original_title": movie.original_title,
-                    "overview": movie.overview,
-                    "tagline": movie.tagline,
-                    "release_date": movie.release_date.isoformat()
-                    if movie.release_date
-                    else None,
-                    "year": movie.year,
-                    "runtime": getattr(movie, 'runtime', None),
-                    "rating": movie.vote_average,
-                    "vote_count": movie.vote_count,
-                    "popularity": movie.popularity,
-                    "original_language": movie.original_language,
-                    "adult": movie.adult,
-                    "poster_url": movie.poster_url,
-                    "backdrop_url": movie.backdrop_url,
-                    # Add similarity score
-                    "similarity_score": score_map.get(movie.id, 0.0),
-                    # Genre names (from relationship)
-                    "genres": [g.name for g in movie.genres] if movie.genres else [],
-                    # Keywords (from relationship)
-                    "keywords": [k.name for k in movie.keywords]
-                    if movie.keywords
-                    else [],
-                    # Cast (from relationship) - top 5
+                    "movie_id": anchor.id,  # media_id — stable public ID
+                    "tmdb_id": concrete.tmdb_id,
+                    "media_type": concrete.media_type,
+                    "title": concrete.title,
+                    "original_title": concrete.original_title,
+                    "overview": concrete.overview,
+                    "tagline": concrete.tagline,
+                    "release_date": concrete.release_date.isoformat() if concrete.release_date else None,
+                    "year": year,
+                    "runtime": getattr(concrete, "runtime", None),
+                    "rating": concrete.vote_average,
+                    "vote_count": concrete.vote_count,
+                    "popularity": concrete.popularity,
+                    "original_language": concrete.original_language,
+                    "adult": concrete.adult,
+                    "poster_url": concrete.poster_url,
+                    "backdrop_url": concrete.backdrop_url,
+                    "similarity_score": score_map.get(anchor.id, 0.0),
+                    # Relational data lives on the anchor
+                    "genres": [g.name for g in anchor.genres] if anchor.genres else [],
+                    "keywords": [k.name for k in anchor.keywords] if anchor.keywords else [],
                     "cast": [
-                        {
-                            "name": cast.name,
-                            "profile_path": cast.profile_path,
-                        }
-                        for cast in (movie.cast_members[:5] if movie.cast_members else [])
+                        {"name": c.name, "profile_path": c.profile_path}
+                        for c in (anchor.cast_members[:5] if anchor.cast_members else [])
                     ],
                 }
                 enriched.append(movie_dict)

@@ -42,11 +42,14 @@ async def generate_why_reasons(
         List of exactly 3 strings.
     """
     try:
-        genre_names = ", ".join(g.name for g in (getattr(film, "genres", None) or []))
+        anchor = getattr(film, "media", None)
+        enrichment = getattr(anchor, "enrichment", None) if anchor else None
+        genres = (getattr(anchor, "genres", None) if anchor else None) or []
+        genre_names = ", ".join(g.name for g in genres)
         overview = getattr(film, "overview", "") or ""
         title = getattr(film, "title", "this film")
-        narrative_dna = getattr(film, "narrative_dna", "") or ""
-        tone_tags = getattr(film, "tone_tags", None) or []
+        narrative_dna = (getattr(enrichment, "narrative_dna", "") if enrichment else "") or ""
+        tone_tags = (getattr(enrichment, "tone_tags", None) if enrichment else None) or []
         tone_str = ", ".join(tone_tags) if tone_tags else ""
 
         prompt = (

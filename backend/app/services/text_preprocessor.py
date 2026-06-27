@@ -37,23 +37,28 @@ class TextPreprocessor:
         Preprocess a media item into structured text for embedding.
 
         Args:
-            movie: Media entity (Movie or TVShow) with relationships loaded
+            movie: Movie or TVShow ORM object with media relationship loaded.
 
         Returns:
             Cleaned, structured text ready for embedding
         """
         parts = []
 
+        # Resolve relational and enrichment data from the media anchor
+        anchor = getattr(movie, "media", None)
+        enrichment = anchor.enrichment if anchor else None
+
         # 1. Title + year + content type header
         year = movie.release_date.year if movie.release_date else None
-        content_type = "Movie" if getattr(movie, "media_type", "movie") == "movie" else "TV Series"
+        content_type = "Movie" if movie.media_type == "movie" else "TV Series"
         year_str = f" ({year})" if year else ""
         parts.append(f"{movie.title.strip()}{year_str} [{content_type}]")
 
         # 2. Genres | tone_tags | themes
-        genre_names = [g.name for g in movie.genres] if movie.genres else []
-        tone_tags = getattr(movie, "tone_tags", None) or []
-        themes = getattr(movie, "themes", None) or []
+        genres_rel = (anchor.genres if anchor else None) or []
+        genre_names = [g.name for g in genres_rel]
+        tone_tags = (enrichment.tone_tags if enrichment else None) or []
+        themes = (enrichment.themes if enrichment else None) or []
         category_parts = []
         if genre_names:
             category_parts.append(", ".join(genre_names))
@@ -92,7 +97,7 @@ class TextPreprocessor:
             parts.append(" | ".join(context_line))
 
         # 5. Narrative DNA (enriched) or overview (fallback)
-        narrative_dna = getattr(movie, "narrative_dna", None)
+        narrative_dna = (enrichment.narrative_dna if enrichment else None)
         if narrative_dna and narrative_dna.strip():
             parts.append(narrative_dna.strip())
         elif movie.overview:
@@ -107,13 +112,15 @@ class TextPreprocessor:
                 parts.append(f'"{tagline}"')
 
         # 7. Cast with character names
-        if movie.cast_members:
-            cast_list = movie.cast_members[: settings.MAX_CAST_MEMBERS]
+        cast_rel = (anchor.cast_members if anchor else None) or []
+        if cast_rel:
+            cast_list = cast_rel[: settings.MAX_CAST_MEMBERS]
             parts.append(f"Cast: {', '.join(c.name for c in cast_list)}")
 
         # 8. Keywords
-        if movie.keywords:
-            keyword_names = [k.name for k in movie.keywords[: settings.MAX_KEYWORDS]]
+        keywords_rel = (anchor.keywords if anchor else None) or []
+        if keywords_rel:
+            keyword_names = [k.name for k in keywords_rel[: settings.MAX_KEYWORDS]]
             if keyword_names:
                 parts.append(f"Keywords: {', '.join(keyword_names)}")
 
@@ -155,7 +162,8 @@ class TextPreprocessor:
             try:
                 text = TextPreprocessor.preprocess_movie(movie)
                 if TextPreprocessor.validate_text(text):
-                    results.append((movie.id, text))
+                    # Use media_id as the stable ID for embedding storage
+                    results.append((movie.media_id, text))
             except Exception as e:
                 title = getattr(movie, "title", "unknown")
                 movie_id = getattr(movie, "id", "unknown")

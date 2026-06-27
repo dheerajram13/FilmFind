@@ -1,58 +1,48 @@
 """
 Movie/Media mapping utilities.
 
-Provides DRY utilities for converting Media models to response schemas.
+Converts Movie / TVShow ORM objects (or dicts from the search pipeline)
+to response schemas. The concrete models now hold all scalar fields directly;
+relational data (genres, cast, keywords) lives on movie.media.
 """
 
-from app.models.media import Media, Movie
+from app.models.media import Movie, TVShow
 from app.schemas.movie import MovieResponse, MovieSearchResult
 
+# Type alias for the concrete resource types
+_Resource = Movie | TVShow
 
-def movie_to_response(media: Media) -> MovieResponse:
-    """
-    Convert Media model (Movie or TVShow) to MovieResponse schema.
 
-    Args:
-        media: Media model instance (Movie or TVShow)
-
-    Returns:
-        MovieResponse schema
-    """
-    # Get runtime from Movie-specific field if it's a Movie
-    runtime = getattr(media, 'runtime', None) if hasattr(media, 'runtime') else None
+def movie_to_response(resource: _Resource) -> MovieResponse:
+    """Convert a Movie or TVShow ORM object to MovieResponse."""
+    runtime = getattr(resource, "runtime", None)
 
     return MovieResponse(
-        id=media.id,
-        tmdb_id=media.tmdb_id,
-        media_type=media.media_type,
-        title=media.title,
-        release_date=media.release_date,
-        overview=media.overview,
-        poster_path=media.poster_path,
-        backdrop_path=media.backdrop_path,
-        genres=media.genres,
-        vote_average=media.vote_average,
-        vote_count=media.vote_count,
-        popularity=media.popularity,
+        id=resource.media_id,           # expose media_id as the stable public ID
+        tmdb_id=resource.tmdb_id,
+        media_type=resource.media_type,
+        title=resource.title,
+        release_date=resource.release_date,
+        overview=resource.overview,
+        poster_path=resource.poster_url,
+        backdrop_path=resource.backdrop_url,
+        genres=resource.media.genres if resource.media else [],
+        vote_average=resource.vote_average,
+        vote_count=resource.vote_count,
+        popularity=resource.popularity,
         runtime=runtime,
-        original_language=media.original_language,
-        adult=media.adult,
+        original_language=resource.original_language,
+        adult=resource.adult,
     )
 
 
-def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
+def movie_to_search_result(movie: _Resource | dict) -> MovieSearchResult:
     """
-    Convert Movie model or dict to MovieSearchResult schema.
+    Convert a Movie/TVShow ORM object or a search pipeline dict to MovieSearchResult.
 
-    Includes similarity and relevance scores if present.
-
-    Args:
-        movie: Movie model instance or dict (may have similarity_score, final_score fields)
-
-    Returns:
-        MovieSearchResult schema
+    The search pipeline passes dicts (from retrieval_engine) that may contain
+    similarity_score, final_score, and match_explanation alongside media fields.
     """
-    # Helper to get value from both dict and object
     def get_val(obj, key, default=None):
         if isinstance(obj, dict):
             return obj.get(key, default)
@@ -60,54 +50,75 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
 
     from app.schemas.movie import CastSchema, GenreSchema, KeywordSchema
 
-    # Convert genres (string names or ORM objects or dicts → GenreSchema)
+    # Genres — string names, dicts, or ORM Genre objects
     genres_raw = get_val(movie, "genres", [])
+    if not genres_raw and not isinstance(movie, dict) and movie.media:
+        genres_raw = movie.media.genres
     genres = []
-    if genres_raw:
-        for genre in genres_raw:
-            if isinstance(genre, str):
-                genres.append(GenreSchema(id=0, name=genre))
-            elif isinstance(genre, dict):
-                genres.append(GenreSchema(**genre))
-            else:
-                genres.append(genre)
+    for genre in genres_raw:
+        if isinstance(genre, str):
+            genres.append(GenreSchema(id=0, name=genre))
+        elif isinstance(genre, dict):
+            genres.append(GenreSchema(**genre))
+        else:
+            genres.append(genre)
 
-    # Convert keywords (string names or ORM objects → KeywordSchema)
+    # Keywords
     keywords_raw = get_val(movie, "keywords", [])
+    if not keywords_raw and not isinstance(movie, dict) and movie.media:
+        keywords_raw = movie.media.keywords
     keywords = []
-    if keywords_raw:
-        for kw in keywords_raw:
-            if isinstance(kw, str):
-                keywords.append(KeywordSchema(id=0, name=kw))
-            elif isinstance(kw, dict):
-                keywords.append(KeywordSchema(**kw))
-            else:
-                keywords.append(kw)
+    for kw in keywords_raw:
+        if isinstance(kw, str):
+            keywords.append(KeywordSchema(id=0, name=kw))
+        elif isinstance(kw, dict):
+            keywords.append(KeywordSchema(**kw))
+        else:
+            keywords.append(kw)
 
-    # Convert cast — retrieval_engine stores as "cast" (list of dicts with name/profile_path)
-    # ORM objects have cast_members attribute
+    # Cast — retrieval_engine stores as "cast" (list of dicts)
     cast_raw = get_val(movie, "cast_members", None) or get_val(movie, "cast", [])
+    if not cast_raw and not isinstance(movie, dict) and movie.media:
+        cast_raw = movie.media.cast_members
     cast_members = []
-    if cast_raw:
-        for c in cast_raw[:5]:  # top 5
-            if isinstance(c, dict):
-                cast_members.append(CastSchema(
-                    id=c.get("id", 0),
-                    name=c.get("name", ""),
-                    profile_path=c.get("profile_path"),
-                ))
-            else:
-                cast_members.append(c)
+    for c in (cast_raw or [])[:5]:
+        if isinstance(c, dict):
+            cast_members.append(CastSchema(
+                id=c.get("id", 0),
+                name=c.get("name", ""),
+                profile_path=c.get("profile_path"),
+            ))
+        else:
+            cast_members.append(c)
+
+    # Resolve poster/backdrop — ORM objects expose .poster_url / .backdrop_url
+    poster = (
+        get_val(movie, "poster_path") or get_val(movie, "poster_url")
+        if isinstance(movie, dict)
+        else movie.poster_url
+    )
+    backdrop = (
+        get_val(movie, "backdrop_path") or get_val(movie, "backdrop_url")
+        if isinstance(movie, dict)
+        else movie.backdrop_url
+    )
+
+    # Public ID: media_id for ORM objects, "id" or "movie_id" for dicts
+    public_id = (
+        get_val(movie, "id") or get_val(movie, "movie_id")
+        if isinstance(movie, dict)
+        else movie.media_id
+    )
 
     return MovieSearchResult(
-        id=get_val(movie, "id") or get_val(movie, "movie_id"),
+        id=public_id,
         tmdb_id=get_val(movie, "tmdb_id"),
         media_type=get_val(movie, "media_type", "movie"),
         title=get_val(movie, "title"),
         release_date=get_val(movie, "release_date"),
         overview=get_val(movie, "overview"),
-        poster_path=get_val(movie, "poster_path") or get_val(movie, "poster_url"),
-        backdrop_path=get_val(movie, "backdrop_path") or get_val(movie, "backdrop_url"),
+        poster_path=poster,
+        backdrop_path=backdrop,
         genres=genres,
         keywords=keywords,
         cast_members=cast_members,
@@ -120,27 +131,9 @@ def movie_to_search_result(movie: Movie | dict) -> MovieSearchResult:
     )
 
 
-def movies_to_responses(movies: list[Movie]) -> list[MovieResponse]:
-    """
-    Convert list of Movie models to list of MovieResponse schemas.
-
-    Args:
-        movies: List of Movie model instances
-
-    Returns:
-        List of MovieResponse schemas
-    """
-    return [movie_to_response(movie) for movie in movies]
+def movies_to_responses(movies: list[_Resource]) -> list[MovieResponse]:
+    return [movie_to_response(m) for m in movies]
 
 
-def movies_to_search_results(movies: list[Movie | dict]) -> list[MovieSearchResult]:
-    """
-    Convert list of Movie models or dicts to list of MovieSearchResult schemas.
-
-    Args:
-        movies: List of Movie model instances or dicts
-
-    Returns:
-        List of MovieSearchResult schemas
-    """
-    return [movie_to_search_result(movie) for movie in movies]
+def movies_to_search_results(movies: list[_Resource | dict]) -> list[MovieSearchResult]:
+    return [movie_to_search_result(m) for m in movies]
