@@ -16,7 +16,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import DatabaseSession, make_rate_limit_dependency
 from app.core.cache_manager import get_cache_manager
@@ -32,7 +32,7 @@ from app.core.scoring import (
 from app.db.sessions import log_sixty_session, update_sixty_action
 from app.models.media import Media
 from app.schemas.movie import MovieResponse
-from app.services.film_admin_service import sixty_cache_key
+from app.services.cache_service import sixty_cache_key
 from app.services.sixty_scorer import score_films_sql
 from app.services.sixty_why import generate_why_reasons
 from app.utils.logger import get_logger
@@ -46,9 +46,9 @@ _sixty_rate_limit = make_rate_limit_dependency(settings.RATE_LIMIT_SIXTY_PER_MIN
 _SIXTY_CACHE_TTL = 86400  # 24 hours
 
 
-# ---------------------------------------------------------------------------
+
 # Request / Response schemas
-# ---------------------------------------------------------------------------
+
 
 
 class SixtyPickRequest(BaseModel):
@@ -94,9 +94,9 @@ class SixtyActionRequest(BaseModel):
     retry_clicked: bool = False
 
 
-# ---------------------------------------------------------------------------
+
 # Cache helpers
-# ---------------------------------------------------------------------------
+
 
 
 def _load_candidates_from_cache(
@@ -113,7 +113,17 @@ def _load_candidates_from_cache(
         return None
 
     id_score = {int(item["id"]): float(item["score"]) for item in cached}
-    films = db.query(Media).filter(Media.id.in_(id_score.keys())).all()
+    films = (
+        db.query(Media)
+        .filter(Media.id.in_(id_score.keys()))
+        .options(
+            selectinload(Media.movie),
+            selectinload(Media.tv_show),
+            selectinload(Media.enrichment),
+            selectinload(Media.assets),
+        )
+        .all()
+    )
     if not films:
         return None
 
@@ -132,9 +142,9 @@ def _store_candidates_in_cache(
     cache.set(key, payload, ttl=_SIXTY_CACHE_TTL)
 
 
-# ---------------------------------------------------------------------------
+
 # Endpoints
-# ---------------------------------------------------------------------------
+
 
 
 @router.post("/pick", status_code=status.HTTP_200_OK, response_model=SixtyPickResponse, dependencies=[Depends(_sixty_rate_limit)])
@@ -182,14 +192,21 @@ async def sixty_pick(
     )
 
     # Weighted random pick from top 3 (with noise for variety)
-    selected_film: Media = weighted_random_top3(scored)
-    best_score = next((s for f, s in scored if f.id == selected_film.id), 0.0)
+    selected_anchor: Media = weighted_random_top3(scored)
+    best_score = next((s for f, s in scored if f.id == selected_anchor.id), 0.0)
     match_score = match_score_to_percent(best_score)
+
+    concrete = selected_anchor.movie or selected_anchor.tv_show
+    if not concrete:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Selected film has no concrete record.",
+        )
 
     # Generate personalised why-reasons
     try:
         why_reasons = await generate_why_reasons(
-            film=selected_film,
+            film=concrete,
             mood_label=request.mood,
             context_label=request.context,
             craving_label=request.craving,
@@ -213,16 +230,16 @@ async def sixty_pick(
         mood=request.mood,
         context=request.context,
         craving=request.craving,
-        film_id=selected_film.id,
+        film_id=selected_anchor.id,
         match_score=match_score,
         seconds_taken=request.seconds_taken or 0,
         session_token=request.session_token,
     )
 
-    film_response = movie_to_response(selected_film)
+    film_response = movie_to_response(concrete)
 
     logger.info(
-        f"sixty_pick result: {selected_film.title!r} match_score={match_score} "
+        f"sixty_pick result: {concrete.title!r} match_score={match_score} "
         f"mood={request.mood} context={request.context} craving={request.craving}"
     )
 

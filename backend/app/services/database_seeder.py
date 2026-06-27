@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from app.core.database import SessionLocal
-from app.models.media import Cast, Genre, Keyword, Movie
+from app.models.media import Cast, Genre, Keyword, Media, Movie
 from app.repositories.movie_repository import (
     CastRepository,
     GenreRepository,
@@ -78,9 +78,9 @@ class DatabaseSeederService:
                 self.db.rollback()
             self.db.close()
 
-    # =============================================================================
+    
     # Public Methods
-    # =============================================================================
+    
 
     def seed_from_directory(
         self,
@@ -172,9 +172,9 @@ class DatabaseSeederService:
 
         return self._import_movies_batch(movies, batch_size=len(movies))
 
-    # =============================================================================
+    
     # Private Methods - Import Logic
-    # =============================================================================
+    
 
     def _import_movies_batch(
         self,
@@ -266,60 +266,61 @@ class DatabaseSeederService:
             logger.debug(f"Movie {tmdb_id} already exists, skipping")
             return "skipped"
 
-        # Create movie entity (pass tmdb_id separately)
-        movie = self._create_movie_from_data(movie_data, tmdb_id)
+        # Create Media anchor first (relationships live here)
+        anchor = Media(content_type="Movie")
+        self.db.add(anchor)
+        self.db.flush()  # get anchor.id
 
-        # Add relationships
+        # Assign relationships to the anchor
         if "genres" in movie_data:
-            movie.genres = [self._get_or_create_genre(g) for g in movie_data["genres"]]
+            anchor.genres = [self._get_or_create_genre(g) for g in movie_data["genres"]]
 
         if "keywords" in movie_data and isinstance(movie_data["keywords"], dict):
             keywords_list = movie_data["keywords"].get("keywords", [])
-            movie.keywords = [self._get_or_create_keyword(k) for k in keywords_list]
+            anchor.keywords = [self._get_or_create_keyword(k) for k in keywords_list]
 
         if "credits" in movie_data and isinstance(movie_data["credits"], dict):
-            cast_list = movie_data["credits"].get("cast", [])[:10]  # Top 10 cast
-            movie.cast_members = [self._get_or_create_cast(c) for c in cast_list]
+            cast_list = movie_data["credits"].get("cast", [])[:10]
+            anchor.cast_members = [self._get_or_create_cast(c) for c in cast_list]
 
-        # Save to database
+        # Create Movie row pointing at anchor
+        movie = self._create_movie_from_data(movie_data, tmdb_id, anchor.id)
         self.movie_repo.create(movie)
 
         return "imported"
 
-    # =============================================================================
+    
     # Private Methods - Entity Creation
-    # =============================================================================
+    
 
-    def _create_movie_from_data(self, data: dict, tmdb_id: int) -> Movie:
+    def _create_movie_from_data(self, data: dict, tmdb_id: int, media_id: int) -> Movie:
         """
         Create Movie entity from TMDB data.
 
         Args:
             data: TMDB movie dictionary
             tmdb_id: TMDB ID of the movie
+            media_id: Pre-created Media anchor ID
 
         Returns:
             Movie instance (not yet saved to DB)
         """
-        # Parse release date - support both ISO format and datetime string
         release_date = None
         if data.get("release_date"):
             try:
-                # Try ISO format first (YYYY-MM-DD)
                 release_date = datetime.strptime(data["release_date"], "%Y-%m-%d")
             except ValueError:
                 try:
-                    # Try datetime format with time (YYYY-MM-DD HH:MM:SS)
                     release_date = datetime.strptime(data["release_date"], "%Y-%m-%d %H:%M:%S")
                 except ValueError:
                     logger.warning(f"Invalid release date format: {data['release_date']}")
 
-        # Extract streaming providers (if available)
         streaming_providers = None
         if "watch/providers" in data:
             streaming_providers = data["watch/providers"].get("results", {})
 
         return Movie(
+            media_id=media_id,
             tmdb_id=tmdb_id,
             title=data.get("title", ""),
             original_title=data.get("original_title"),
@@ -332,8 +333,6 @@ class DatabaseSeederService:
             vote_average=data.get("vote_average"),
             vote_count=data.get("vote_count"),
             original_language=data.get("original_language"),
-            poster_path=data.get("poster_path"),
-            backdrop_path=data.get("backdrop_path"),
             status=data.get("status"),
             budget=data.get("budget"),
             revenue=data.get("revenue"),
@@ -399,9 +398,9 @@ class DatabaseSeederService:
         self._cast_cache[tmdb_id] = cast
         return cast
 
-    # =============================================================================
+    
     # Helper Methods
-    # =============================================================================
+    
 
     def _empty_stats(self) -> dict[str, int]:
         """Create empty statistics dictionary."""

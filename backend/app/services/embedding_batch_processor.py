@@ -20,7 +20,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.media import Media, Movie, TVShow
+from app.models.media import Media, MediaEmbedding, Movie, TVShow
 from app.repositories.movie_repository import MovieRepository
 from app.services.embedding_service import get_embedding_service
 from app.services.text_preprocessor import TextPreprocessor
@@ -188,33 +188,73 @@ class EmbeddingBatchProcessor:
             "batches": 0,
         }
 
-        # Get total count for progress tracking
+        from sqlalchemy.orm import selectinload
+
+        # Get total count for progress tracking — items without a media_embedding row
         if skip_existing:
-            total_count = self.db.query(Media).filter(Media.embedding.is_(None)).count()
+            total_count = (
+                self.db.query(Movie)
+                .outerjoin(Movie.media).outerjoin(Media.embedding)
+                .filter(MediaEmbedding.media_id.is_(None))
+                .count()
+            ) + (
+                self.db.query(TVShow)
+                .outerjoin(TVShow.media).outerjoin(Media.embedding)
+                .filter(MediaEmbedding.media_id.is_(None))
+                .count()
+            )
             logger.info(f"Found {total_count} media items without embeddings")
         else:
-            total_count = self.db.query(Media).count()
+            total_count = self.db.query(Movie).count() + self.db.query(TVShow).count()
             logger.info(f"Found {total_count} total media items")
 
         stats["total_media"] = total_count
 
-        # Apply limit if specified
         if limit:
             total_count = min(total_count, limit)
             logger.info(f"Processing limited to {total_count} media items")
+
+        # Collect all items first (movies then TV shows), then paginate
+        def _fetch_batch(offset: int, batch_limit: int) -> list:
+            load_opts = [
+                selectinload(Movie.media).selectinload(Media.genres),
+                selectinload(Movie.media).selectinload(Media.keywords),
+                selectinload(Movie.media).selectinload(Media.cast_members),
+                selectinload(Movie.media).selectinload(Media.enrichment),
+                selectinload(Movie.media).selectinload(Media.embedding),
+            ]
+            tv_load_opts = [
+                selectinload(TVShow.media).selectinload(Media.genres),
+                selectinload(TVShow.media).selectinload(Media.keywords),
+                selectinload(TVShow.media).selectinload(Media.cast_members),
+                selectinload(TVShow.media).selectinload(Media.enrichment),
+                selectinload(TVShow.media).selectinload(Media.embedding),
+            ]
+            if skip_existing:
+                movies = (
+                    self.db.query(Movie)
+                    .outerjoin(Movie.media).outerjoin(Media.embedding)
+                    .filter(MediaEmbedding.media_id.is_(None))
+                    .options(*load_opts)
+                    .offset(offset).limit(batch_limit).all()
+                )
+                shows = (
+                    self.db.query(TVShow)
+                    .outerjoin(TVShow.media).outerjoin(Media.embedding)
+                    .filter(MediaEmbedding.media_id.is_(None))
+                    .options(*tv_load_opts)
+                    .offset(max(0, offset - self.db.query(Movie).count())).limit(batch_limit - len(movies)).all()
+                ) if len(movies) < batch_limit else []
+            else:
+                movies = self.db.query(Movie).options(*load_opts).offset(offset).limit(batch_limit).all()
+                shows = self.db.query(TVShow).options(*tv_load_opts).offset(max(0, offset - self.db.query(Movie).count())).limit(batch_limit - len(movies)).all() if len(movies) < batch_limit else []
+            return movies + shows
 
         # Process in database batches
         offset = 0
         while offset < total_count:
             batch_limit = min(self.db_batch_size, total_count - offset)
-
-            # Fetch batch of media (both movies and TV shows)
-            if skip_existing:
-                media_items = self.db.query(Media).filter(
-                    Media.embedding.is_(None)
-                ).limit(batch_limit).offset(offset).all()
-            else:
-                media_items = self.db.query(Media).limit(batch_limit).offset(offset).all()
+            media_items = _fetch_batch(offset, batch_limit)
 
             if not media_items:
                 break
@@ -293,22 +333,23 @@ class EmbeddingBatchProcessor:
 
         return stats
 
-    def _store_embedding(self, movie_id: int, embedding: np.ndarray) -> None:
+    def _store_embedding(self, media_id: int, embedding: np.ndarray) -> None:
         """
-        Store embedding for a single media item (movie or TV show).
+        Upsert embedding into media_embedding for the given media_id.
 
         Args:
-            movie_id: Media ID
+            media_id: media.id (anchor table PK)
             embedding: 768-dimensional embedding vector
         """
-        # Update media with pgvector embedding
-        media = self.db.query(Media).filter(Media.id == movie_id).first()
-        if not media:
-            raise ValueError(f"Media with ID {movie_id} not found")
-
-        # Store as Python list — pgvector SQLAlchemy type handles conversion
-        media.embedding = embedding.tolist()
-        media.embedding_needs_rebuild = False
+        emb = self.db.query(MediaEmbedding).filter(MediaEmbedding.media_id == media_id).first()
+        if emb is None:
+            emb = MediaEmbedding(
+                media_id=media_id,
+                model_name="sentence-transformers/all-mpnet-base-v2",
+            )
+            self.db.add(emb)
+        emb.embedding = embedding.tolist()
+        emb.needs_rebuild = False
 
     def get_progress(self) -> dict:
         """
@@ -383,8 +424,8 @@ class EmbeddingBatchProcessor:
             results["checked"] += 1
 
             try:
-                # Validate embedding structure
-                emb = movie.embedding
+                emb_row = movie.media.embedding if movie.media else None
+                emb = emb_row.embedding if emb_row else None
                 if emb is None:
                     results["invalid"] += 1
                     results["errors"].append(f"Movie {movie.id}: embedding is NULL")

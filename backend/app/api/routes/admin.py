@@ -15,11 +15,8 @@ from sqlalchemy.orm import selectinload
 from app.api.dependencies import DatabaseSession, require_admin
 from app.models.media import Media, Movie, TVShow
 from app.models.session import SearchSession, SixtySession
-from app.services.film_admin_service import (
-    EmbeddingRegenerationService,
-    FilmEnrichmentService,
-    SixtyRefreshService,
-)
+from app.services.cache_service import SixtyRefreshService
+from app.services.film_ops_service import EmbeddingRegenerationService, FilmEnrichmentService
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
