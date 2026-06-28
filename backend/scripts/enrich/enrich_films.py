@@ -22,24 +22,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.media import Media, MediaEnrichment, Movie, TVShow
+from app.prompts import load_prompt
 from app.services.llm_client import LLMClient
 
 
-_SYSTEM_PROMPT = (
-    "You are a film analysis expert. Given a film's title, overview, and genres, "
-    "extract structured metadata. Respond ONLY with valid JSON matching this schema exactly:\n"
-    "{\n"
-    '  "narrative_dna": "<2-3 sentence description of narrative structure, themes, and emotional arc>",\n'
-    '  "themes": ["theme1", "theme2", "theme3"],\n'
-    '  "tone_tags": ["tone1", "tone2"],\n'
-    '  "darkness_score": <integer 0-10>,\n'
-    '  "complexity_score": <integer 0-10>,\n'
-    '  "energy_score": <integer 0-10>\n'
-    "}\n"
-    "darkness_score: 0=pure family-friendly, 10=very dark/disturbing.\n"
-    "complexity_score: 0=very simple plot, 10=highly complex/cerebral.\n"
-    "energy_score: 0=slow/meditative, 10=high-octane/intense."
-)
+_SYSTEM_PROMPT = load_prompt("enrich", "1")
 
 
 def enrich_batch(batch_size: int, offset: int = 0) -> None:

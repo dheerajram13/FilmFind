@@ -33,6 +33,11 @@ try:
 except FileNotFoundError:
     _QUERY_PARSER_SYSTEM_PROMPT = None
 
+try:
+    _QUERY_PARSER_USER_TEMPLATE = load_prompt("query_parser_user", "2")
+except FileNotFoundError:
+    _QUERY_PARSER_USER_TEMPLATE = None
+
 
 class QueryParser:
     """
@@ -107,75 +112,10 @@ class QueryParser:
             "Respond with valid JSON only."
         )
 
-        user_prompt = f"""Parse this movie/TV show search query and extract information:
-
-Query: "{query}"
-
-Return a JSON object with this structure:
-{{
-  "themes": ["list of themes"],
-  "tones": ["list of tones from: dark, light, serious, comedic, inspirational, intense, "
-    "relaxing, suspenseful"],
-  "emotions": ["list of emotions from: joy, fear, sadness, awe, thrill, hope, romance, dark_tone"],
-  "reference_titles": ["movies/shows mentioned as references"],
-  "keywords": ["important keywords"],
-  "plot_elements": ["specific plot elements"],
-  "undesired_themes": ["themes to avoid"],
-  "undesired_tones": ["tones to avoid"],
-  "is_comparison_query": true/false,
-  "is_mood_query": true/false,
-  "media_type": "movie" or "tv_show" or "both",
-  "genres": ["list of genres"],
-  "exclude_genres": ["genres to exclude"],
-  "languages": ["list of language codes like 'en', 'hi', 'ko'"],
-  "year_min": null or year,
-  "year_max": null or year,
-  "rating_min": null or rating (0-10),
-  "runtime_min": null or minutes,
-  "runtime_max": null or minutes,
-  "streaming_providers": ["Netflix", "Prime Video", etc.],
-  "popular_only": true/false,
-  "hidden_gems": true/false,
-  "search_text": "optimized text for semantic search"
-}}
-
-Examples:
-1. Query: "dark sci-fi movies like Interstellar with less romance"
-   - themes: ["space exploration", "science fiction", "time dilation"]
-   - tones: ["dark", "serious"]
-   - emotions: ["awe", "dark_tone"]
-   - reference_titles: ["Interstellar"]
-   - undesired_themes: ["romance"]  # "with less romance" indicates romance should be avoided
-   - genres: ["Science Fiction"]
-   - search_text: "dark science fiction space exploration time dilation cosmic themes"
-
-2. Query: "lighthearted sitcoms like Friends about group of friends"
-   - themes: ["friendship", "relationships", "comedy of life"]
-   - tones: ["light", "comedic"]
-   - emotions: ["joy", "hope"]
-   - reference_titles: ["Friends"]
-   - genres: ["Comedy"]
-   - media_type: "tv_show"
-   - search_text: "lighthearted sitcom friendship group friends comedy relationships"
-
-3. Query: "Telugu action movies from 2020-2023 with high ratings"
-   - themes: ["action", "heroism"]
-   - languages: ["te"]
-   - year_min: 2020
-   - year_max: 2023
-   - rating_min: 7.0
-   - genres: ["Action"]
-   - search_text: "action heroism intense fight sequences"
-
-4. Query: "thriller without jump scares and no violence"
-   - themes: ["suspense", "mystery"]
-   - tones: ["suspenseful"]
-   - emotions: ["thrill"]
-   - undesired_themes: ["jump scares", "violence"]  # "without" and "no" indicate avoidance
-   - genres: ["Thriller"]
-   - search_text: "suspense mystery psychological thriller"
-
-Now parse the query and respond with JSON only."""
+        if _QUERY_PARSER_USER_TEMPLATE:
+            user_prompt = _QUERY_PARSER_USER_TEMPLATE.replace("<USER_QUERY>", query)
+        else:
+            user_prompt = f'Parse this movie/TV show search query and respond with JSON only.\n\nQuery: "{query}"'
 
         # Generate JSON response
         response_json = self.llm_client.generate_json(

@@ -99,9 +99,9 @@ def _normalize_scores(candidates: list[dict]) -> list[dict]:
 _search_rate_limit = make_rate_limit_dependency(settings.RATE_LIMIT_SEARCH_PER_MINUTE)
 
 
-# =============================================================================
+
 # Service Dependencies
-# =============================================================================
+
 
 
 def get_query_parser() -> QueryParser:
@@ -129,15 +129,12 @@ def get_reranker() -> LLMReRanker:
     return LLMReRanker()
 
 
-# =============================================================================
 # Search Endpoints
-# =============================================================================
-
 
 @router.post("/search", status_code=status.HTTP_200_OK, response_model=SearchResponse, dependencies=[Depends(_search_rate_limit)])
 async def search_movies(
     request: SearchRequest,
-    db: DatabaseSession,  # noqa: ARG001
+    db: DatabaseSession,  
     query_parser: QueryParser = Depends(get_query_parser),
     retrieval_engine: SemanticRetrievalEngine = Depends(get_retrieval_engine),
     scoring_engine: MultiSignalScoringEngine = Depends(get_scoring_engine),
@@ -572,9 +569,9 @@ async def get_trending_movies(
     }
 
 
-# =============================================================================
+
 # Session Click Endpoint
-# =============================================================================
+
 
 
 class SearchClickRequest(BaseModel):

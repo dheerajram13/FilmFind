@@ -10,17 +10,14 @@ import re
 
 from loguru import logger
 
+from app.prompts import load_prompt
 from app.services.llm_client import LLMClient
 
 
-_SYSTEM_PROMPT = (
-    "You are a concise film recommendation assistant. "
-    "Your job is to explain in exactly 3 short bullet points why a specific film "
-    "perfectly matches a viewer's current mood and craving. "
-    "Each bullet must be a single sentence (max 15 words). "
-    "Respond ONLY with a JSON array of exactly 3 strings, e.g. "
-    '[\"reason one\", \"reason two\", \"reason three\"]. No extra text.'
-)
+try:
+    _SYSTEM_PROMPT = load_prompt("sixty_why", "1")
+except FileNotFoundError:
+    _SYSTEM_PROMPT = None
 
 
 async def generate_why_reasons(

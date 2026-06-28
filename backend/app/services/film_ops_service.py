@@ -9,17 +9,17 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.media import MediaEmbedding, MediaEnrichment, Movie, TVShow
+from app.prompts import load_prompt
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_client import LLMClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_ENRICH_SYSTEM = (
-    "You are a film analysis expert. Respond ONLY with valid JSON:\n"
-    '{"narrative_dna":"...","themes":[...],"tone_tags":[...],'
-    '"darkness_score":0,"complexity_score":0,"energy_score":0}'
-)
+try:
+    _ENRICH_SYSTEM = load_prompt("enrich", "1")
+except FileNotFoundError:
+    _ENRICH_SYSTEM = None
 
 
 def _clamp(value: object, lo: int, hi: int) -> Optional[int]:
