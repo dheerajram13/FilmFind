@@ -27,10 +27,23 @@ from __future__ import annotations
 
 import argparse
 import math
+import shutil
 import statistics
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+_HF_CACHE = Path.home() / ".cache" / "huggingface" / "hub"
+_FLASHRANK_CACHE = Path.home() / ".cache" / "flashrank"
+
+
+def _clear_model_cache() -> None:
+    """Delete downloaded model files to free disk between runs."""
+    for cache_dir in (_HF_CACHE, _FLASHRANK_CACHE):
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            print(f"    cleared {cache_dir}")
 
 # ─── Evaluation dataset ──────────────────────────────────────────────────────
 # Relevance labels: 2 = highly relevant, 1 = somewhat relevant, 0 = irrelevant
@@ -238,7 +251,7 @@ def _load_flashrank(model_id: str):
 
 # ─── Core benchmark loop ─────────────────────────────────────────────────────
 
-def run_model(cfg: dict[str, Any], top_k: int = 5) -> BenchResult:
+def run_model(cfg: dict[str, Any], top_k: int = 5, clear_cache: bool = False) -> BenchResult:
     result = BenchResult(name=cfg["name"], desc=cfg["desc"], load_s=0.0)
 
     # Load model
@@ -283,6 +296,10 @@ def run_model(cfg: dict[str, Any], top_k: int = 5) -> BenchResult:
         result.ndcg10.append(ndcg_at_k(ranked_rels, 10))
         result.mrr_scores.append(mrr(ranked_rels))
         result.p5.append(precision_at_k(ranked_rels, 5))
+
+    del model  # release memory before optional cache wipe
+    if clear_cache:
+        _clear_model_cache()
 
     return result
 
@@ -373,17 +390,25 @@ def main() -> None:
         help=f"Models to run: {', '.join(m['key'] for m in MODELS)} (default: all)",
     )
     parser.add_argument("--top-k", type=int, default=5, help="Top-k for NDCG/P computation")
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Delete each model's cached files after benchmarking it (saves disk — one model on disk at a time)",
+    )
     args = parser.parse_args()
 
     selected_keys = set(args.models) if "all" not in args.models else {m["key"] for m in MODELS}
     selected = [m for m in MODELS if m["key"] in selected_keys]
+
+    if args.clear_cache:
+        print("  --clear-cache enabled: model files will be deleted after each run\n")
 
     print(f"\nRunning benchmark for {len(selected)} model(s) across {len(TEST_CASES)} queries …\n")
 
     results: list[BenchResult] = []
     for cfg in selected:
         print(f"  [{cfg['name']}] loading …", end="", flush=True)
-        r = run_model(cfg, top_k=args.top_k)
+        r = run_model(cfg, top_k=args.top_k, clear_cache=args.clear_cache)
         if r.error:
             print(f" FAILED — {r.error}")
         else:
