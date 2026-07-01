@@ -22,7 +22,7 @@ Data migration:
   - media enrichment columns → media_enrichment
   - poster/backdrop paths/urls → media_asset rows
 
-Revision ID: c3d4e5f6a7b8
+Revision ID: f6a7b8c9d0e1
 Revises: a412a545a5e9
 Create Date: 2026-06-27 00:01:00.000000
 """
@@ -32,7 +32,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
-revision: str = 'c3d4e5f6a7b8'
+revision: str = 'f6a7b8c9d0e1'
 down_revision: Union[str, None] = 'a412a545a5e9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

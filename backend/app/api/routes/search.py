@@ -23,7 +23,6 @@ from app.api.cache_dependencies import (
 )
 from app.api.constants import (
     MIN_QUERY_LENGTH,
-    RERANK_MULTIPLIER,
     RETRIEVAL_MULTIPLIER,
     SIMILAR_MOVIES_BUFFER,
 )
@@ -49,7 +48,7 @@ from app.schemas.search import SearchFilters, SearchRequest, SearchResponse
 from app.services.constraint_validator import ConstraintValidator
 from app.services.filter_engine import FilterEngine
 from app.services.query_parser import QueryParser
-from app.services.reranker import LLMReRanker
+from app.services.cross_encoder_reranker import CrossEncoderReRanker
 from app.services.retrieval_engine import SemanticRetrievalEngine
 from app.services.scoring_engine import MultiSignalScoringEngine
 from app.utils.logger import get_logger
@@ -124,9 +123,8 @@ def get_scoring_engine() -> MultiSignalScoringEngine:
     return MultiSignalScoringEngine()
 
 
-def get_reranker() -> LLMReRanker:
-    """Dependency for LLM reranker."""
-    return LLMReRanker()
+def get_reranker() -> CrossEncoderReRanker:
+    return CrossEncoderReRanker()
 
 
 # Search Endpoints
@@ -134,13 +132,13 @@ def get_reranker() -> LLMReRanker:
 @router.post("/search", status_code=status.HTTP_200_OK, response_model=SearchResponse, dependencies=[Depends(_search_rate_limit)])
 async def search_movies(
     request: SearchRequest,
-    db: DatabaseSession,  
+    db: DatabaseSession,
     query_parser: QueryParser = Depends(get_query_parser),
     retrieval_engine: SemanticRetrievalEngine = Depends(get_retrieval_engine),
     scoring_engine: MultiSignalScoringEngine = Depends(get_scoring_engine),
-    reranker: LLMReRanker = Depends(get_reranker),
     filter_engine: FilterEngine = Depends(get_filter_engine),
     validator: ConstraintValidator = Depends(get_constraint_validator),
+    reranker: CrossEncoderReRanker = Depends(get_reranker),
     cache: SearchCacheStrategy = Depends(get_search_cache),
 ) -> SearchResponse:
     """
@@ -268,20 +266,13 @@ async def search_movies(
             msg,
         ) from exc
 
-    # Step 6: Re-rank top results with LLM
+    # Step 6: Re-rank top results with cross-encoder (FlashRank-MiniLM-L12)
     top_k = min(request.limit, len(scored_candidates))
-    try:
-        reranked_results = reranker.rerank(
-            candidates=scored_candidates[: top_k * RERANK_MULTIPLIER],
-            user_query=request.query,
-            parsed_query=query_intent,
-            top_k=top_k,
-        )
-        logger.info(f"Re-ranked to top {len(reranked_results)} results")
-    except Exception as exc:
-        logger.error(f"Re-ranking failed: {exc}")
-        # Fallback to scored results if re-ranking fails
-        reranked_results = scored_candidates[:top_k]
+    reranked_results = reranker.rerank(
+        candidates=scored_candidates,
+        query=request.query,
+        top_k=top_k,
+    )
 
     # Convert to response format
     results = movies_to_search_results(_normalize_scores(reranked_results))
