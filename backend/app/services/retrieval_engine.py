@@ -163,7 +163,7 @@ class SemanticRetrievalEngine:
                     "similarity_score": 0.89,
                     "overview": "...",
                     "genres": ["Sci-Fi", "Drama"],
-                    "rating": 8.4,
+                    "vote_average": 8.4,
                     "popularity": 142.5,
                     ...
                 }
@@ -341,7 +341,7 @@ class SemanticRetrievalEngine:
                     "release_date": concrete.release_date.isoformat() if concrete.release_date else None,
                     "year": year,
                     "runtime": getattr(concrete, "runtime", None),
-                    "rating": concrete.vote_average,
+                    "vote_average": concrete.vote_average,
                     "vote_count": concrete.vote_count,
                     "popularity": concrete.popularity,
                     "original_language": concrete.original_language,
@@ -448,7 +448,7 @@ class SemanticRetrievalEngine:
             filtered = [
                 c
                 for c in filtered
-                if (c.get("rating") or 0) >= constraints.rating_min
+                if (c.get("vote_average") or 0) >= constraints.rating_min
             ]
             logger.debug(
                 f"After rating filter (>={constraints.rating_min}): "

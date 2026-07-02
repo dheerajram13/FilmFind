@@ -222,7 +222,7 @@ class RatingQualityExtractor(SignalExtractor):
             Rating quality score in [0.0, 1.0]
         """
         _ = parsed_query, context  # Unused but part of interface
-        rating = movie.get("rating", 0.0)
+        rating = movie.get("vote_average", 0.0)
         vote_count = movie.get("vote_count", 0)
 
         if rating <= 0:
