@@ -346,6 +346,7 @@ class SemanticRetrievalEngine:
                     "popularity": concrete.popularity,
                     "original_language": concrete.original_language,
                     "adult": concrete.adult,
+                    "streaming_providers": concrete.streaming_providers,
                     "poster_url": concrete.poster_url,
                     "backdrop_url": concrete.backdrop_url,
                     "similarity_score": score_map.get(anchor.id, 0.0),
