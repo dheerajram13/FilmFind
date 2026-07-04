@@ -24,7 +24,7 @@ type StepId = "q1" | "q2" | "q3";
 type SixtySecondModeProps = {
   open: boolean;
   onClose: () => void;
-  onApplyQuery: (query: string) => void;
+  onWatchMovie: (movie: Movie) => void;
 };
 
 const ANALYSIS_RING_RADIUS = 24;
@@ -366,7 +366,7 @@ function logSixtyAction(sessionId: string, action: SixtyActionRequest): void {
   });
 }
 
-export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondModeProps) {
+export function SixtySecondMode({ open, onClose, onWatchMovie }: SixtySecondModeProps) {
   const [screen, setScreen] = useState<Screen>("q1");
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -377,7 +377,6 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
   const [analysisVisibleSteps, setAnalysisVisibleSteps] = useState(0);
   const [resultMovie, setResultMovie] = useState<Movie | null>(null);
   const [resultMatch, setResultMatch] = useState(95);
-  const [resultQuery, setResultQuery] = useState("");
   const [resultWhy, setResultWhy] = useState<string[]>([]);
   const [resultElapsed, setResultElapsed] = useState<number | null>(null);
   const [resultSessionId, setResultSessionId] = useState<string>("");
@@ -413,7 +412,6 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
     setAnalysisVisibleSteps(0);
     setResultMovie(null);
     setResultMatch(95);
-    setResultQuery("");
     setResultWhy([]);
     setResultElapsed(null);
     setResultSessionId("");
@@ -499,9 +497,6 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
     setAnalysisCountdown(3);
 
     const elapsed = Math.max(1, 60 - timerSeconds);
-    const query = buildModeQuery(moodKey, contextKey, cravingKey);
-    setResultQuery(query);
-
     const sessionToken = `ff-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const resultPromise = resolveMovieSixtyPick(moodKey, contextKey, cravingKey, sessionToken, elapsed);
 
@@ -917,7 +912,7 @@ export function SixtySecondMode({ open, onClose, onApplyQuery }: SixtySecondMode
                     className="ff60-btn-primary"
                     onClick={() => {
                       logSixtyAction(resultSessionId, { watch_clicked: true });
-                      onApplyQuery(resultQuery);
+                      onWatchMovie(resolvedMovie);
                     }}
                   >
                     ▶ &nbsp;Watch on {watchProvider}

@@ -89,9 +89,9 @@ export function FilmfindHome() {
       <SixtySecondMode
         open={sixtyModeOpen}
         onClose={() => setSixtyModeOpen(false)}
-        onApplyQuery={(modeQuery) => {
+        onWatchMovie={(movie) => {
           setSixtyModeOpen(false);
-          void search.runSearch(modeQuery);
+          search.openDetail(movie);
         }}
       />
     </div>
