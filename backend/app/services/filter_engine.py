@@ -209,15 +209,15 @@ class FilterEngine:
 
         filtered = []
         for movie in movies:
-            # Skip movies without runtime
+            # Skip entries without a known runtime (TMDB uses 0 for unknown)
             runtime = _get_attr(movie, 'runtime')
             if not runtime:
                 continue
 
             # Apply runtime constraints
-            if runtime_min and runtime < runtime_min:
+            if runtime_min is not None and runtime < runtime_min:
                 continue
-            if runtime_max and runtime > runtime_max:
+            if runtime_max is not None and runtime > runtime_max:
                 continue
 
             filtered.append(movie)

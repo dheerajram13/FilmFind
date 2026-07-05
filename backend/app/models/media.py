@@ -218,6 +218,17 @@ class TVShow(Resource, Base):
 
     media = relationship("Media", back_populates="tv_show")
 
+    @property
+    def runtime(self) -> int | None:
+        """Typical episode length in minutes, derived from episode_run_time.
+
+        Lets runtime filters and mappers treat TV shows uniformly with movies
+        via getattr(obj, "runtime", None).
+        """
+        if self.episode_run_time:
+            return self.episode_run_time[0]
+        return None
+
     __table_args__ = (
         Index("uq_tv_shows_tmdb_id", "tmdb_id", unique=True),
         Index("idx_tv_shows_language_popularity", "original_language", "popularity"),
