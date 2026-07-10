@@ -12,8 +12,10 @@ from sqlalchemy import engine_from_config, pool
 # Add parent directory to path to import app modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.config import settings 
-from app.core.database import Base  
+from app.core.config import settings
+from app.core.database import Base
+import app.models.media  
+import app.models.session 
 
 
 # Alembic Config object, provides access to .ini file values
