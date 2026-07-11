@@ -62,6 +62,16 @@ class TMDBClient:
             "include_adult": "false",
         })
 
+    def get_movie_changes(self, start_date: str) -> list[int]:
+        """IDs of movies that changed since start_date (ISO format: YYYY-MM-DD)."""
+        resp = self._get("/movie/changes", {"start_date": start_date})
+        return [item["id"] for item in (resp or {}).get("results", []) if not item.get("adult")]
+
+    def get_tv_changes(self, start_date: str) -> list[int]:
+        """IDs of TV shows that changed since start_date (ISO format: YYYY-MM-DD)."""
+        resp = self._get("/tv/changes", {"start_date": start_date})
+        return [item["id"] for item in (resp or {}).get("results", []) if not item.get("adult")]
+
     def discover_tv(
         self,
         genre_id: int,

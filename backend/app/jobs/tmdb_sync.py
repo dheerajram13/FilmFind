@@ -1,160 +1,188 @@
 """
-TMDB data synchronization job.
+TMDB daily delta sync job.
 
-Fetches new and updated movies from TMDB API on a daily basis.
+Uses the TMDB /movie/changes and /tv/changes endpoints to get IDs of films that
+changed in the last 24 hours, then fetches full details and upserts mutable
+fields. Marks media_embedding.needs_rebuild = TRUE so stale embeddings are
+regenerated on the next embedding run.
+
+New films detected here are NOT fully ingested (no image upload, no relational
+linking). The weekly full ingest via ingest_media.py handles that.
 """
 
+import json
 from datetime import UTC, datetime, timedelta
+from typing import Optional
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.cache_dependencies import get_cache_invalidator
-from app.models.media import Media, Movie
 from app.services.tmdb.tmdb_service import TMDBService
 from app.utils.job_utils import JobStats, execute_with_db
 from app.utils.logger import get_logger
-
 
 logger = get_logger(__name__)
 
 
 def sync_tmdb_data() -> dict:
     """
-    Sync new and updated movies from TMDB.
+    Daily delta sync — runs via APScheduler.
 
-    Runs daily to fetch:
-    - New movies released in the last 7 days
-    - Updated popularity scores for existing movies
-
-    Returns:
-        Dictionary with sync statistics
+    Fetches changed movie and TV show IDs from TMDB's changes endpoints,
+    updates mutable fields, and marks embeddings for rebuild.
     """
     return execute_with_db(
-        _sync_tmdb_data_logic,
-        "TMDB data sync job",
-        {"new_movies": 0, "updated_movies": 0},
+        _sync_logic,
+        "TMDB delta sync",
+        {"movies_updated": 0, "tv_updated": 0, "new_detected": 0, "failed": 0},
     )
 
 
-def _sync_tmdb_data_logic(db: Session, stats: JobStats) -> None:
-    """
-    Core logic for TMDB sync job.
+def _sync_logic(db: Session, stats: JobStats) -> None:
+    tmdb = TMDBService()
+    start_date = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
 
-    Args:
-        db: Database session
-        stats: Job statistics tracker
-    """
-    tmdb_service = TMDBService()
+    logger.info(f"TMDB delta sync — changes since {start_date}")
 
-    # Get movies from last 7 days
-    end_date = datetime.now(UTC).date()
-    start_date = end_date - timedelta(days=7)
+    # Movies
+    movie_ids = tmdb.client.get_movie_changes(start_date)
+    logger.info(f"  {len(movie_ids)} changed movie IDs")
+    for tmdb_id in movie_ids:
+        result = _sync_one(db, tmdb, tmdb_id, is_tv=False)
+        if result == "updated":
+            stats.increment("movies_updated")
+        elif result == "new":
+            stats.increment("new_detected")
+        elif result == "failed":
+            stats.increment("failed")
 
-    logger.info(f"Fetching movies from {start_date} to {end_date}")
+    # TV shows
+    tv_ids = tmdb.client.get_tv_changes(start_date)
+    logger.info(f"  {len(tv_ids)} changed TV IDs")
+    for tmdb_id in tv_ids:
+        result = _sync_one(db, tmdb, tmdb_id, is_tv=True)
+        if result == "updated":
+            stats.increment("tv_updated")
+        elif result == "new":
+            stats.increment("new_detected")
+        elif result == "failed":
+            stats.increment("failed")
 
-    # Fetch new movies
-    new_movies_data = _fetch_recent_movies(
-        tmdb_service, start_date.isoformat(), end_date.isoformat()
+    logger.info(
+        f"Sync complete — movies_updated={stats.get('movies_updated')} "
+        f"tv_updated={stats.get('tv_updated')} "
+        f"new_detected={stats.get('new_detected')} "
+        f"failed={stats.get('failed')}"
     )
 
-    # Process and save new movies
-    for movie_data in new_movies_data:
-        try:
-            existing_movie = db.query(Movie).filter(Movie.tmdb_id == movie_data["id"]).first()
 
-            if existing_movie:
-                # Update existing movie
-                _update_movie(db, existing_movie, movie_data)
-                stats.increment("updated_movies")
-            else:
-                # Create new movie
-                _create_movie(db, movie_data)
-                stats.increment("new_movies")
-
-        except Exception as exc:
-            logger.error(f"Error processing movie {movie_data.get('id')}: {exc}")
-            stats.increment("errors")
-
-    # Invalidate caches after data update
-    if stats.get("new_movies") > 0:
-        cache_invalidator = get_cache_invalidator()
-        cache_invalidator.invalidate_new_movies()
-        logger.info("Invalidated caches after adding new movies")
-
-
-def _fetch_recent_movies(
-    tmdb_service: TMDBService,
-    start_date: str,  # noqa: ARG001
-    end_date: str,  # noqa: ARG001
-) -> list[dict]:
+def _sync_one(db: Session, tmdb: TMDBService, tmdb_id: int, is_tv: bool) -> str:
     """
-    Fetch recent movies from TMDB.
+    Fetch full details for one changed film and upsert mutable fields.
 
-    Args:
-        tmdb_service: TMDB service instance
-        start_date: Start date (ISO format)
-        end_date: End date (ISO format)
-
-    Returns:
-        List of movie data dictionaries
+    Returns: "updated" | "new" | "skipped" | "failed"
     """
-    # This is a simplified version - you would implement proper pagination
-    # and use TMDB's discover endpoint with date filters
-    movies = []
     try:
-        # Example: fetch popular movies as a placeholder
-        # In production, use discover endpoint with release_date.gte and release_date.lte
-        popular_movies = tmdb_service.get_popular_movies(page=1)
-        if popular_movies:
-            movies.extend(popular_movies[:20])  # Limit for demo
+        full = tmdb.client.get_tv_show(tmdb_id) if is_tv else tmdb.client.get_movie(tmdb_id)
+        if not full:
+            return "skipped"
+
+        if is_tv:
+            if not tmdb.validator.validate_tv_show(full):
+                return "skipped"
+            cleaned = tmdb.validator.clean_tv_show_data(full)
+            table = "tv_shows"
+        else:
+            if not tmdb.validator.validate_movie(full):
+                return "skipped"
+            cleaned = tmdb.validator.clean_movie_data(full)
+            table = "movies"
+
+        row = db.execute(
+            text(f"SELECT media_id FROM {table} WHERE tmdb_id = :tid"),
+            {"tid": tmdb_id},
+        ).fetchone()
+
+        if not row:
+            # Not in our catalogue yet — weekly full ingest will add it if it
+            # meets the quality floor. Log and skip.
+            logger.debug(f"tmdb_id={tmdb_id} not in catalogue, skipping delta sync")
+            return "new"
+
+        media_id = row.media_id
+
+        # Update mutable fields — all scalar columns that change over time
+        if is_tv:
+            db.execute(text("""
+                UPDATE tv_shows SET
+                    title               = :title,
+                    overview            = :overview,
+                    status              = :status,
+                    popularity          = :popularity,
+                    vote_average        = :vote_average,
+                    vote_count          = :vote_count,
+                    streaming_providers = :streaming_providers,
+                    number_of_seasons   = :seasons,
+                    number_of_episodes  = :episodes,
+                    in_production       = :in_production,
+                    last_air_date       = :last_air,
+                    updated_at          = NOW()
+                WHERE tmdb_id = :tmdb_id
+            """), {
+                "title": cleaned["title"],
+                "overview": cleaned.get("overview"),
+                "status": cleaned.get("status"),
+                "popularity": cleaned.get("popularity"),
+                "vote_average": cleaned.get("vote_average"),
+                "vote_count": cleaned.get("vote_count"),
+                "streaming_providers": _j(cleaned.get("streaming_providers")),
+                "seasons": cleaned.get("number_of_seasons"),
+                "episodes": cleaned.get("number_of_episodes"),
+                "in_production": cleaned.get("in_production", False),
+                "last_air": cleaned.get("last_air_date"),
+                "tmdb_id": tmdb_id,
+            })
+        else:
+            db.execute(text("""
+                UPDATE movies SET
+                    title               = :title,
+                    overview            = :overview,
+                    status              = :status,
+                    popularity          = :popularity,
+                    vote_average        = :vote_average,
+                    vote_count          = :vote_count,
+                    streaming_providers = :streaming_providers,
+                    updated_at          = NOW()
+                WHERE tmdb_id = :tmdb_id
+            """), {
+                "title": cleaned["title"],
+                "overview": cleaned.get("overview"),
+                "status": cleaned.get("status"),
+                "popularity": cleaned.get("popularity"),
+                "vote_average": cleaned.get("vote_average"),
+                "vote_count": cleaned.get("vote_count"),
+                "streaming_providers": _j(cleaned.get("streaming_providers")),
+                "tmdb_id": tmdb_id,
+            })
+
+        # Mark embedding stale — overview or other text fields may have changed
+        db.execute(
+            text("UPDATE media_embedding SET needs_rebuild = TRUE WHERE media_id = :mid"),
+            {"mid": media_id},
+        )
+
+        db.commit()
+        return "updated"
+
     except Exception as exc:
-        logger.error(f"Error fetching recent movies: {exc}")
-
-    return movies
-
-
-def _create_movie(db: Session, movie_data: dict) -> None:
-    """
-    Create new movie in database.
-
-    Args:
-        db: Database session
-        movie_data: Movie data from TMDB
-    """
-    anchor = Media(content_type="Movie")
-    db.add(anchor)
-    db.flush()  # get anchor.id
-
-    movie = Movie(
-        media_id=anchor.id,
-        tmdb_id=movie_data["id"],
-        title=movie_data.get("title", ""),
-        overview=movie_data.get("overview", ""),
-        release_date=movie_data.get("release_date"),
-        vote_average=movie_data.get("vote_average", 0.0),
-        vote_count=movie_data.get("vote_count", 0),
-        popularity=movie_data.get("popularity", 0.0),
-        runtime=movie_data.get("runtime"),
-        original_language=movie_data.get("original_language", "en"),
-        adult=movie_data.get("adult", False),
-    )
-    db.add(movie)
-    logger.debug(f"Created new movie: {movie.title}")
+        logger.error(f"Failed to sync tmdb_id={tmdb_id}: {exc}")
+        db.rollback()
+        return "failed"
 
 
-def _update_movie(db: Session, movie: Movie, movie_data: dict) -> None:  # noqa: ARG001
-    """
-    Update existing movie with latest data.
-
-    Args:
-        db: Database session
-        movie: Existing movie object
-        movie_data: Updated movie data from TMDB
-    """
-    # Update fields that may change
-    movie.popularity = movie_data.get("popularity", movie.popularity)
-    movie.vote_average = movie_data.get("vote_average", movie.vote_average)
-    movie.vote_count = movie_data.get("vote_count", movie.vote_count)
-    movie.overview = movie_data.get("overview", movie.overview)
-
-    logger.debug(f"Updated movie: {movie.title}")
+def _j(val) -> Optional[str]:
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return json.dumps(val)
+    return val

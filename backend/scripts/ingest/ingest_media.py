@@ -382,6 +382,12 @@ def ingest_movies(
                 # Upload images to Supabase only for new records
                 if is_new:
                     _upload_images(storage, db, media_id, tmdb_id, cleaned["poster_path"], cleaned["backdrop_path"])
+                else:
+                    # Mark embedding stale so it gets regenerated on next embedding run
+                    db.execute(
+                        text("UPDATE media_embedding SET needs_rebuild = TRUE WHERE media_id = :mid"),
+                        {"mid": media_id},
+                    )
 
                 db.commit()
                 saved += 1
@@ -557,6 +563,11 @@ def ingest_tv(
 
                 if is_new:
                     _upload_images(storage, db, media_id, tmdb_id, cleaned["poster_path"], cleaned["backdrop_path"])
+                else:
+                    db.execute(
+                        text("UPDATE media_embedding SET needs_rebuild = TRUE WHERE media_id = :mid"),
+                        {"mid": media_id},
+                    )
 
                 db.commit()
                 saved += 1
