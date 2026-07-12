@@ -148,9 +148,9 @@ def score_film(film: Any, mood: str, context: str, craving: str) -> float:
         crav_dim_fit × 0.15  — craving-driven dimension boost
         crav_fit     × 0.15  — film's explicit craving score (direct JSONB lookup)
     """
-    darkness: int = film.darkness_score or 5
-    complexity: int = film.complexity_score or 5
-    energy: int = film.energy_score or 5
+    darkness: int = film.darkness_score if film.darkness_score is not None else 5
+    complexity: int = film.complexity_score if film.complexity_score is not None else 5
+    energy: int = film.energy_score if film.energy_score is not None else 5
     mood_scores: dict = film.mood_scores or {}
     context_scores: dict = film.context_scores or {}
     craving_scores: dict = film.craving_scores or {}
