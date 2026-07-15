@@ -418,6 +418,7 @@ def ingest_tv(
     min_votes: int,
     min_rating: float,
     dry_run: bool = False,
+    limit: Optional[int] = None,
 ) -> None:
     logger.info(f"TV ingestion — {pages_per_genre} pages/genre, min_votes={min_votes}, min_rating={min_rating}")
     tmdb = TMDBService()
@@ -430,6 +431,8 @@ def ingest_tv(
             tmdb.client, TV_GENRES, pages_per_genre, is_tv=True,
             min_vote_count=min_votes, min_vote_average=min_rating,
         )
+        if limit:
+            tmdb_ids = tmdb_ids[:limit]
         logger.info(f"Collected {len(tmdb_ids)} unique TV IDs — fetching full details")
 
         saved = skipped = failed = 0
@@ -607,18 +610,20 @@ def main():
                         help="Minimum vote average floor (default: 6.0)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print what would be ingested without writing to DB")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Cap the number of items ingested per media type (useful for testing)")
     args = parser.parse_args()
 
     if not args.movies and not args.tv:
         parser.error("Specify --movies and/or --tv")
 
     if args.movies:
-        ingest_movies(args.pages_per_genre, args.min_votes, args.min_rating, args.dry_run)
+        ingest_movies(args.pages_per_genre, args.min_votes, args.min_rating, args.dry_run, args.limit)
 
     if args.tv:
         # TV shows typically have fewer votes — default to lower floor
         min_votes = args.min_votes if args.min_votes != 300 else 100
-        ingest_tv(args.pages_per_genre, min_votes, args.min_rating, args.dry_run)
+        ingest_tv(args.pages_per_genre, min_votes, args.min_rating, args.dry_run, args.limit)
 
 
 if __name__ == "__main__":
