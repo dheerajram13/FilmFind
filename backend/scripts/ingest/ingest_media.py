@@ -239,6 +239,7 @@ def ingest_movies(
     min_votes: int,
     min_rating: float,
     dry_run: bool = False,
+    limit: Optional[int] = None,
 ) -> None:
     logger.info(f"Movie ingestion — {pages_per_genre} pages/genre, min_votes={min_votes}, min_rating={min_rating}")
     tmdb = TMDBService()
@@ -252,6 +253,8 @@ def ingest_movies(
             tmdb.client, MOVIE_GENRES, pages_per_genre, is_tv=False,
             min_vote_count=min_votes, min_vote_average=min_rating,
         )
+        if limit:
+            tmdb_ids = tmdb_ids[:limit]
         logger.info(f"Collected {len(tmdb_ids)} unique movie IDs — fetching full details")
 
         # Phase 2: fetch full details and upsert
