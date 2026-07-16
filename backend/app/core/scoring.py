@@ -15,9 +15,6 @@ Key design decisions:
   (happy, sad, charged, chill, adventurous, romantic)
 
 References:
-- Russell, J.A. (1980). A circumplex model of affect.
-  Journal of Personality and Social Psychology, 39(6), 1161–1178.
-  → Source for energy weights (= arousal coordinates) in MOOD_PROFILES.
 - Mohammad, S. (2018). NRC Valence, Arousal, and Dominance Lexicon.
   National Research Council Canada. https://saifmohammad.com/WebPages/nrc-vad.html
   → Source for CRAVING_BOOSTERS valence/arousal values.
@@ -37,21 +34,18 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 MOOD_PROFILES: dict[str, dict[str, float]] = {
-    # Energy weights = Russell (1980) Circumplex arousal coordinates.
-    # Complexity weights are approximations (no direct Circumplex analog).
-    # Mood cross-weights derived from V×A dot-product similarity between moods.
     "happy": {
-        "energy": 0.51,        # Circumplex arousal +0.51
+        "energy": 0.51,
         "complexity": 0.10,    # approx — simple emotional state
         "mood_happy": 0.70,
         "mood_sad": -0.50,
-        "mood_charged": 0.10,  # adjacent on Circumplex (was -0.20, wrong sign)
+        "mood_charged": 0.10,  # adjacent to happy (was -0.20, wrong sign)
         "mood_chill": 0.20,
         "mood_adventurous": 0.20,
         "mood_romantic": 0.20,
     },
     "sad": {
-        "energy": -0.27,       # Circumplex arousal -0.27
+        "energy": -0.27,       # arousal -0.27
         "complexity": 0.30,    # approx — emotional processing
         "mood_happy": -0.10,
         "mood_sad": 0.70,
@@ -61,9 +55,9 @@ MOOD_PROFILES: dict[str, dict[str, float]] = {
         "mood_romantic": 0.40,
     },
     "charged": {
-        "energy": 0.75,        # Circumplex arousal +0.75
+        "energy": 0.75,        # arousal +0.75
         "complexity": 0.30,    # approx — cognitive engagement
-        "mood_happy": 0.20,    # moderately similar to charged on Circumplex (was 0.10)
+        "mood_happy": 0.20,    # moderately similar to charged (was 0.10)
         "mood_sad": -0.30,
         "mood_charged": 0.70,
         "mood_chill": -0.40,
@@ -71,7 +65,7 @@ MOOD_PROFILES: dict[str, dict[str, float]] = {
         "mood_romantic": -0.20,
     },
     "chill": {
-        "energy": -0.57,       # Circumplex arousal -0.57
+        "energy": -0.57,       # arousal -0.57
         "complexity": -0.10,   # approx — low cognitive demand
         "mood_happy": 0.30,
         "mood_sad": 0.10,
@@ -81,7 +75,7 @@ MOOD_PROFILES: dict[str, dict[str, float]] = {
         "mood_romantic": 0.30,
     },
     "adventurous": {
-        "energy": 0.62,        # Circumplex arousal +0.62
+        "energy": 0.62,        # arousal +0.62
         "complexity": 0.30,    # approx — cognitive engagement
         "mood_happy": 0.20,
         "mood_sad": -0.10,
@@ -91,7 +85,7 @@ MOOD_PROFILES: dict[str, dict[str, float]] = {
         "mood_romantic": 0.00,
     },
     "romantic": {
-        "energy": 0.16,        # Circumplex arousal +0.16
+        "energy": 0.16,        # arousal +0.16
         "complexity": 0.10,    # approx — emotionally focused
         "mood_happy": 0.30,
         "mood_sad": 0.20,

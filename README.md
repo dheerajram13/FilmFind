@@ -278,6 +278,13 @@ See [deploy.md](deploy.md) for the full guide. Target stack (100% free tier):
 
 ---
 
+## References
+
+- Russell, J.A. (1980). A circumplex model of affect. *Journal of Personality and Social Psychology*, 39(6), 1161–1178. — Source for mood energy weights (arousal coordinates) in 60-second mode scoring.
+- Mohammad, S. (2018). NRC Valence, Arousal, and Dominance Lexicon. National Research Council Canada. https://saifmohammad.com/WebPages/nrc-vad.html — Source for craving booster valence/arousal values.
+
+---
+
 ## License
 
 MIT
